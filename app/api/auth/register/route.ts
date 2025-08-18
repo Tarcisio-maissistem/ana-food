@@ -109,6 +109,37 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] Usuário criado com sucesso:", user.id)
 
+    const empresaData = {
+      nome: nomeFantasia || nomeCompleto,
+      cnpj: cnpj || `CPF-${cpf}`, // Se não tiver CNPJ, usa CPF como identificador
+      telefone: phone,
+      endereco: endereco && numero ? `${endereco}, ${numero}${complemento ? `, ${complemento}` : ""}` : null,
+      email: email,
+      ativo: true,
+      user_id: user.id, // Associar empresa ao usuário
+    }
+
+    // Verificar se já existe empresa com este CNPJ/CPF
+    const { data: existingEmpresa } = await supabase.from("empresas").select("id").eq("cnpj", empresaData.cnpj).single()
+
+    if (!existingEmpresa) {
+      const { data: empresa, error: empresaError } = await supabase
+        .from("empresas")
+        .insert(empresaData)
+        .select()
+        .single()
+
+      if (empresaError) {
+        console.error("Erro ao criar empresa:", empresaError)
+        // Não falha o registro se não conseguir criar a empresa
+        console.log("[v0] Continuando sem criar empresa devido ao erro:", empresaError.message)
+      } else {
+        console.log("[v0] Empresa criada com sucesso:", empresa.id)
+      }
+    } else {
+      console.log("[v0] Empresa já existe, pulando criação")
+    }
+
     const defaultSettings = [
       { user_id: user.id, key: "auto_accept", value: { enabled: false } },
       { user_id: user.id, key: "sound_enabled", value: { enabled: true } },
