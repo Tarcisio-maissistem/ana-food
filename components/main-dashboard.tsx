@@ -8,8 +8,10 @@ import { ProductsScreen } from "./products-screen"
 import { PrintersScreen } from "./printers-screen"
 import { CustomersScreen } from "./customers-screen"
 import { SettingsScreen } from "./settings-screen"
+import { CategoriesScreen } from "./categories-screen"
+import { AdditionalsScreen } from "./additionals-screen"
 
-export type Screen = "pedidos" | "produtos" | "clientes" | "impressoras" | "configuracoes"
+export type Screen = "pedidos" | "produtos" | "clientes" | "impressoras" | "categorias" | "adicionais" | "configuracoes"
 
 export function MainDashboard() {
   const [currentScreen, setCurrentScreen] = useState<Screen>("pedidos")
@@ -26,6 +28,10 @@ export function MainDashboard() {
         return <CustomersScreen />
       case "impressoras":
         return <PrintersScreen />
+      case "categorias":
+        return <CategoriesScreen />
+      case "adicionais":
+        return <AdditionalsScreen />
       case "configuracoes":
         return <SettingsScreen />
       default:
@@ -47,7 +53,7 @@ export function MainDashboard() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <Topbar onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
 
-        <main className="flex-1 overflow-auto p-3">{renderScreen()}</main>
+        <main className="flex-1 overflow-auto p-3 my-0 py-0">{renderScreen()}</main>
       </div>
     </div>
   )

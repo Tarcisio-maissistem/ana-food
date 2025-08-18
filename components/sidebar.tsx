@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { ShoppingCart, Package, Users, Printer, Settings, ChefHat, X } from "lucide-react"
+import { ShoppingCart, Package, Users, Printer, Settings, ChefHat, X, FolderOpen, Plus } from "lucide-react"
 import type { Screen } from "./main-dashboard"
 
 interface SidebarProps {
@@ -17,6 +17,8 @@ interface SidebarProps {
 const menuItems = [
   { id: "pedidos" as Screen, label: "Pedidos", icon: ShoppingCart },
   { id: "produtos" as Screen, label: "Produtos", icon: Package },
+  { id: "categorias" as Screen, label: "Categorias", icon: FolderOpen },
+  { id: "adicionais" as Screen, label: "Adicionais", icon: Plus },
   { id: "clientes" as Screen, label: "Clientes", icon: Users },
   { id: "impressoras" as Screen, label: "Impressoras", icon: Printer },
   { id: "configuracoes" as Screen, label: "Configurações", icon: Settings },
@@ -49,7 +51,7 @@ export function Sidebar({
           )}
         >
           {!isCollapsed && (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 cursor-pointer" onClick={() => onScreenChange("pedidos")}>
               <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
                 <ChefHat className="w-5 h-5 text-white" />
               </div>
@@ -58,7 +60,10 @@ export function Sidebar({
           )}
 
           {isCollapsed && (
-            <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
+            <div
+              className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center cursor-pointer"
+              onClick={() => onScreenChange("pedidos")}
+            >
               <ChefHat className="w-5 h-5 text-white" />
             </div>
           )}
@@ -87,7 +92,7 @@ export function Sidebar({
                 key={item.id}
                 variant={currentScreen === item.id ? "default" : "ghost"}
                 className={cn(
-                  "w-full gap-3 h-12 transition-all duration-200",
+                  "w-full gap-3 h-12 transition-all duration-200 font-semibold",
                   isCollapsed ? "justify-center px-0" : "justify-start",
                   currentScreen === item.id && "bg-orange-500 hover:bg-orange-600 text-white",
                 )}

@@ -26,6 +26,7 @@ import {
   Package,
   Truck,
 } from "lucide-react"
+import { toast } from "react-hot-toast"
 
 // Tipos de dados
 interface OrderItem {
@@ -50,47 +51,6 @@ interface Order {
   estimatedTime?: number
 }
 
-// Mock de dados iniciais
-const mockOrders: Order[] = [
-  {
-    id: "1",
-    number: 1001,
-    customerName: "João Silva",
-    items: [
-      { id: "1", name: "X-Burger", quantity: 2, price: 25.9, complements: ["Bacon", "Queijo extra"] },
-      { id: "2", name: "Batata Frita", quantity: 1, price: 12.5, complements: [] },
-    ],
-    paymentMethod: "Cartão de Crédito",
-    address: "Rua das Flores, 123 - Centro",
-    observations: "Sem cebola no hambúrguer",
-    status: "novo",
-    type: "delivery",
-    createdAt: new Date(),
-    estimatedTime: 30,
-  },
-  {
-    id: "2",
-    number: 1002,
-    customerName: "Maria Santos",
-    items: [{ id: "3", name: "Pizza Margherita", quantity: 1, price: 35.0, complements: ["Borda recheada"] }],
-    paymentMethod: "PIX",
-    status: "preparando",
-    type: "retirada",
-    createdAt: new Date(Date.now() - 15 * 60 * 1000),
-    estimatedTime: 20,
-  },
-  {
-    id: "3",
-    number: 1003,
-    customerName: "Pedro Costa",
-    items: [{ id: "4", name: "Açaí 500ml", quantity: 1, price: 18.0, complements: ["Granola", "Banana", "Mel"] }],
-    paymentMethod: "Dinheiro",
-    status: "pronto",
-    type: "retirada",
-    createdAt: new Date(Date.now() - 25 * 60 * 1000),
-  },
-]
-
 // Dados para relatórios
 const paymentData = [
   { name: "PIX", value: 45, color: "#10B981" },
@@ -109,19 +69,41 @@ const dailyOrders = [
 ]
 
 export function AnaFoodDashboard() {
-  const [orders, setOrders] = useState<Order[]>(mockOrders)
-  const [filteredOrders, setFilteredOrders] = useState<Order[]>(mockOrders)
+  const [orders, setOrders] = useState<Order[]>([])
+  const [filteredOrders, setFilteredOrders] = useState<Order[]>([])
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>("todos")
   const [searchTerm, setSearchTerm] = useState("")
   const [autoAccept, setAutoAccept] = useState(false)
   const [soundEnabled, setSoundEnabled] = useState(true)
+  const [loading, setLoading] = useState(true)
   const audioRef = useRef<HTMLAudioElement>(null)
 
-  // Simulação de WebSocket
+  const loadOrders = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch("/api/orders")
+      if (response.ok) {
+        const data = await response.json()
+        setOrders(Array.isArray(data) ? data : [])
+      } else {
+        console.error("Erro ao carregar pedidos")
+        toast.error("Erro ao carregar pedidos")
+      }
+    } catch (error) {
+      console.error("Erro ao carregar pedidos:", error)
+      toast.error("Erro ao carregar pedidos")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadOrders()
+  }, [])
+
   useEffect(() => {
     const interval = setInterval(() => {
-      // Simula novos pedidos ocasionalmente
       if (Math.random() > 0.95) {
         const newOrder: Order = {
           id: Date.now().toString(),
@@ -137,7 +119,6 @@ export function AnaFoodDashboard() {
 
         setOrders((prev) => [newOrder, ...prev])
 
-        // Toca som de notificação
         if (soundEnabled) {
           playNotificationSound(newOrder.type)
         }
@@ -147,7 +128,6 @@ export function AnaFoodDashboard() {
     return () => clearInterval(interval)
   }, [orders.length, soundEnabled])
 
-  // Filtrar pedidos
   useEffect(() => {
     let filtered = orders
 
@@ -167,17 +147,33 @@ export function AnaFoodDashboard() {
   }, [orders, statusFilter, searchTerm])
 
   const playNotificationSound = (type: "delivery" | "retirada") => {
-    // Simula sons diferentes para delivery e retirada
     console.log(`🔊 Som de ${type === "delivery" ? "delivery" : "retirada"}`)
   }
 
-  const updateOrderStatus = (orderId: string, newStatus: Order["status"]) => {
-    setOrders((prev) => prev.map((order) => (order.id === orderId ? { ...order, status: newStatus } : order)))
+  const updateOrderStatus = async (orderId: string, newStatus: Order["status"]) => {
+    try {
+      const response = await fetch("/api/orders", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ id: orderId, status: newStatus }),
+      })
+
+      if (response.ok) {
+        setOrders((prev) => prev.map((order) => (order.id === orderId ? { ...order, status: newStatus } : order)))
+        toast.success("Status atualizado com sucesso")
+      } else {
+        toast.error("Erro ao atualizar status")
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar status:", error)
+      toast.error("Erro ao atualizar status")
+    }
   }
 
   const printOrder = (order: Order) => {
     console.log("🖨️ Imprimindo pedido:", order.number)
-    // Aqui seria chamada a API local de impressão
   }
 
   const getStatusColor = (status: Order["status"]) => {
@@ -238,7 +234,6 @@ export function AnaFoodDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
-      {/* Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-3xl font-bold text-gray-900">Ana Food</h1>
@@ -256,7 +251,6 @@ export function AnaFoodDashboard() {
           </div>
         </div>
 
-        {/* Controles */}
         <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
             <div className="flex items-center gap-2">
@@ -304,108 +298,114 @@ export function AnaFoodDashboard() {
         </TabsList>
 
         <TabsContent value="pedidos">
-          {/* Grid de Pedidos */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredOrders.map((order) => (
-              <Card key={order.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">#{order.number}</CardTitle>
-                    <Badge className={`${getStatusColor(order.status)} text-white`}>
-                      {getStatusText(order.status)}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Clock className="w-4 h-4" />
-                    {Math.floor((Date.now() - order.createdAt.getTime()) / 60000)} min atrás
-                  </div>
-                </CardHeader>
+          {loading ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500">Carregando pedidos...</p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {filteredOrders.map((order) => (
+                  <Card key={order.id} className="hover:shadow-lg transition-shadow">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-lg">#{order.number}</CardTitle>
+                        <Badge className={`${getStatusColor(order.status)} text-white`}>
+                          {getStatusText(order.status)}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <Clock className="w-4 h-4" />
+                        {Math.floor((Date.now() - order.createdAt.getTime()) / 60000)} min atrás
+                      </div>
+                    </CardHeader>
 
-                <CardContent className="space-y-4">
-                  <div>
-                    <p className="font-semibold">{order.customerName}</p>
-                    <div className="flex items-center gap-1 text-sm text-gray-600">
-                      {order.type === "delivery" ? <Truck className="w-4 h-4" /> : <Package className="w-4 h-4" />}
-                      {order.type === "delivery" ? "Delivery" : "Retirada"}
-                    </div>
-                  </div>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <p className="font-semibold">{order.customerName}</p>
+                        <div className="flex items-center gap-1 text-sm text-gray-600">
+                          {order.type === "delivery" ? <Truck className="w-4 h-4" /> : <Package className="w-4 h-4" />}
+                          {order.type === "delivery" ? "Delivery" : "Retirada"}
+                        </div>
+                      </div>
 
-                  <div className="space-y-1">
-                    {order.items.map((item) => (
-                      <div key={item.id} className="text-sm">
-                        <span className="font-medium">
-                          {item.quantity}x {item.name}
-                        </span>
-                        {item.complements.length > 0 && (
-                          <p className="text-gray-600 text-xs ml-2">+ {item.complements.join(", ")}</p>
+                      <div className="space-y-1">
+                        {order.items.map((item) => (
+                          <div key={item.id} className="text-sm">
+                            <span className="font-medium">
+                              {item.quantity}x {item.name}
+                            </span>
+                            {item.complements.length > 0 && (
+                              <p className="text-gray-600 text-xs ml-2">+ {item.complements.join(", ")}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center gap-2 text-sm">
+                        <CreditCard className="w-4 h-4" />
+                        {order.paymentMethod}
+                      </div>
+
+                      {order.address && (
+                        <div className="flex items-start gap-2 text-sm">
+                          <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                          <span className="text-gray-600">{order.address}</span>
+                        </div>
+                      )}
+
+                      {order.observations && (
+                        <div className="text-sm text-gray-600 bg-yellow-50 p-2 rounded">
+                          <strong>Obs:</strong> {order.observations}
+                        </div>
+                      )}
+
+                      <div className="flex gap-2 pt-2">
+                        <Button variant="outline" size="sm" onClick={() => setSelectedOrder(order)} className="flex-1">
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => printOrder(order)}>
+                          <Printer className="w-4 h-4" />
+                        </Button>
+                      </div>
+
+                      <div className="flex gap-2">
+                        {getPreviousStatus(order.status) && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => updateOrderStatus(order.id, getPreviousStatus(order.status)!)}
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {getNextStatus(order.status) && (
+                          <Button
+                            size="sm"
+                            onClick={() => updateOrderStatus(order.id, getNextStatus(order.status)!)}
+                            className="flex-1"
+                          >
+                            {getStatusText(getNextStatus(order.status)!)}
+                            <ChevronRight className="w-4 h-4" />
+                          </Button>
                         )}
                       </div>
-                    ))}
-                  </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
 
-                  <div className="flex items-center gap-2 text-sm">
-                    <CreditCard className="w-4 h-4" />
-                    {order.paymentMethod}
-                  </div>
-
-                  {order.address && (
-                    <div className="flex items-start gap-2 text-sm">
-                      <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">{order.address}</span>
-                    </div>
-                  )}
-
-                  {order.observations && (
-                    <div className="text-sm text-gray-600 bg-yellow-50 p-2 rounded">
-                      <strong>Obs:</strong> {order.observations}
-                    </div>
-                  )}
-
-                  <div className="flex gap-2 pt-2">
-                    <Button variant="outline" size="sm" onClick={() => setSelectedOrder(order)} className="flex-1">
-                      <Eye className="w-4 h-4" />
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => printOrder(order)}>
-                      <Printer className="w-4 h-4" />
-                    </Button>
-                  </div>
-
-                  <div className="flex gap-2">
-                    {getPreviousStatus(order.status) && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => updateOrderStatus(order.id, getPreviousStatus(order.status)!)}
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </Button>
-                    )}
-                    {getNextStatus(order.status) && (
-                      <Button
-                        size="sm"
-                        onClick={() => updateOrderStatus(order.id, getNextStatus(order.status)!)}
-                        className="flex-1"
-                      >
-                        {getStatusText(getNextStatus(order.status)!)}
-                        <ChevronRight className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          {filteredOrders.length === 0 && (
-            <div className="text-center py-12">
-              <p className="text-gray-500">Nenhum pedido encontrado</p>
-            </div>
+              {filteredOrders.length === 0 && !loading && (
+                <div className="text-center py-12">
+                  <p className="text-gray-500">Nenhum pedido encontrado</p>
+                </div>
+              )}
+            </>
           )}
         </TabsContent>
 
         <TabsContent value="relatorios">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Gráfico de Pagamentos */}
             <Card>
               <CardHeader>
                 <CardTitle>Formas de Pagamento</CardTitle>
@@ -432,7 +432,6 @@ export function AnaFoodDashboard() {
               </CardContent>
             </Card>
 
-            {/* Gráfico de Pedidos por Horário */}
             <Card>
               <CardHeader>
                 <CardTitle>Pedidos por Horário</CardTitle>
@@ -450,7 +449,6 @@ export function AnaFoodDashboard() {
               </CardContent>
             </Card>
 
-            {/* Resumo do Dia */}
             <Card className="lg:col-span-2">
               <CardHeader>
                 <CardTitle>Resumo do Dia</CardTitle>
@@ -480,7 +478,6 @@ export function AnaFoodDashboard() {
         </TabsContent>
       </Tabs>
 
-      {/* Modal Ver Pedido */}
       <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -488,7 +485,6 @@ export function AnaFoodDashboard() {
           </DialogHeader>
           {selectedOrder && (
             <div className="space-y-4 font-mono text-sm">
-              {/* Layout similar ao cupom térmico */}
               <div className="text-center border-b pb-2">
                 <div className="font-bold">ANA FOOD</div>
                 <div className="text-xs">Rua Principal, 456</div>

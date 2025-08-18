@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -21,42 +20,56 @@ interface PrinterConfig {
   sector: string
 }
 
-const mockPrinters: PrinterConfig[] = [
-  {
-    id: "1",
-    name: "Epson TM-T20",
-    type: "USB",
-    status: "Conectada",
-    model: "TM-T20",
-    port: "USB001",
-    sector: "Cozinha",
-  },
-  {
-    id: "2",
-    name: "Bematech MP-100S TH",
-    type: "Rede",
-    status: "Desconectada",
-    model: "MP-100S TH",
-    ip: "192.168.1.100",
-    sector: "Caixa",
-  },
-  {
-    id: "3",
-    name: "Daruma DR-800",
-    type: "USB",
-    status: "Conectada",
-    model: "DR-800",
-    port: "USB002",
-    sector: "Bar",
-  },
-]
-
 const sectors = ["Cozinha", "Caixa", "Bar", "Bebidas", "Sobremesas"]
 
 export function PrintersScreen() {
-  const [printers, setPrinters] = useState<PrinterConfig[]>(mockPrinters)
+  const [printers, setPrinters] = useState<PrinterConfig[]>([])
+  const [loading, setLoading] = useState(true)
   const [selectedPrinter, setSelectedPrinter] = useState<PrinterConfig | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+
+  useEffect(() => {
+    loadPrinters()
+  }, [])
+
+  const loadPrinters = async () => {
+    setLoading(true)
+    try {
+      const response = await fetch("/api/printers")
+      if (response.ok) {
+        const data = await response.json()
+        if (Array.isArray(data)) {
+          setPrinters(data)
+        } else if (data && Array.isArray(data.data)) {
+          // Fallback para formato antigo com propriedade data
+          setPrinters(data.data)
+        } else {
+          console.warn("Dados recebidos não são array:", data)
+          setPrinters([])
+        }
+      } else {
+        console.error("Erro na resposta da API:", response.status)
+        setPrinters([])
+        // @ts-ignore
+        window.showToast?.({
+          type: "error",
+          title: "Erro",
+          description: "Erro ao carregar impressoras",
+        })
+      }
+    } catch (error) {
+      console.error("Erro ao carregar impressoras:", error)
+      setPrinters([])
+      // @ts-ignore
+      window.showToast?.({
+        type: "error",
+        title: "Erro",
+        description: "Erro ao conectar com o servidor",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -86,36 +99,116 @@ export function PrintersScreen() {
 
   const testPrinter = (printer: PrinterConfig) => {
     console.log(`🖨️ Testando impressora: ${printer.name}`)
-    // Simula teste de impressão
-    alert(`Teste de impressão enviado para ${printer.name}`)
+    // @ts-ignore
+    window.showToast?.({
+      type: "info",
+      title: "Teste de Impressão",
+      description: `Teste enviado para ${printer.name}`,
+    })
   }
 
   const syncPrinters = () => {
     console.log("🔄 Sincronizando impressoras...")
-    // Simula sincronização
-    alert("Impressoras sincronizadas!")
+    loadPrinters()
+    // @ts-ignore
+    window.showToast?.({
+      type: "success",
+      title: "Sincronização",
+      description: "Impressoras sincronizadas com sucesso!",
+    })
   }
 
-  const handleSavePrinter = (printerData: Partial<PrinterConfig>) => {
-    if (selectedPrinter) {
-      // Editar impressora existente
-      setPrinters((prev) => prev.map((p) => (p.id === selectedPrinter.id ? { ...p, ...printerData } : p)))
-    } else {
-      // Adicionar nova impressora
-      const newPrinter: PrinterConfig = {
-        id: Date.now().toString(),
-        name: printerData.name || "",
-        type: printerData.type || "USB",
-        status: "Desconectada",
-        model: printerData.model || "",
-        port: printerData.port,
-        ip: printerData.ip,
-        sector: printerData.sector || "Cozinha",
+  const handleSavePrinter = async (printerData: Partial<PrinterConfig>) => {
+    try {
+      if (selectedPrinter) {
+        // Editar impressora existente
+        const response = await fetch("/api/printers", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: selectedPrinter.id, ...printerData }),
+        })
+
+        if (response.ok) {
+          const updatedPrinter = await response.json()
+          setPrinters((prev) => prev.map((p) => (p.id === selectedPrinter.id ? updatedPrinter : p)))
+          // @ts-ignore
+          window.showToast?.({
+            type: "success",
+            title: "Sucesso",
+            description: "Impressora atualizada com sucesso!",
+          })
+        } else {
+          throw new Error("Erro ao atualizar impressora")
+        }
+      } else {
+        // Adicionar nova impressora
+        const response = await fetch("/api/printers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(printerData),
+        })
+
+        if (response.ok) {
+          const newPrinter = await response.json()
+          setPrinters((prev) => [...prev, newPrinter])
+          // @ts-ignore
+          window.showToast?.({
+            type: "success",
+            title: "Sucesso",
+            description: "Impressora adicionada com sucesso!",
+          })
+        } else {
+          throw new Error("Erro ao criar impressora")
+        }
       }
-      setPrinters((prev) => [...prev, newPrinter])
+
+      setIsDialogOpen(false)
+      setSelectedPrinter(null)
+    } catch (error) {
+      console.error("Erro ao salvar impressora:", error)
+      // @ts-ignore
+      window.showToast?.({
+        type: "error",
+        title: "Erro",
+        description: "Erro ao salvar impressora",
+      })
     }
-    setIsDialogOpen(false)
-    setSelectedPrinter(null)
+  }
+
+  const handleDeletePrinter = async (printerId: string) => {
+    try {
+      const response = await fetch(`/api/printers?id=${printerId}`, {
+        method: "DELETE",
+      })
+
+      if (response.ok) {
+        setPrinters((prev) => prev.filter((p) => p.id !== printerId))
+        // @ts-ignore
+        window.showToast?.({
+          type: "success",
+          title: "Sucesso",
+          description: "Impressora removida com sucesso!",
+        })
+      } else {
+        throw new Error("Erro ao deletar impressora")
+      }
+    } catch (error) {
+      console.error("Erro ao deletar impressora:", error)
+      // @ts-ignore
+      window.showToast?.({
+        type: "error",
+        title: "Erro",
+        description: "Erro ao remover impressora",
+      })
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+      </div>
+    )
   }
 
   return (
@@ -158,58 +251,67 @@ export function PrintersScreen() {
               </tr>
             </thead>
             <tbody>
-              {printers.map((printer) => (
-                <tr key={printer.id} className="border-b hover:bg-gray-50">
-                  <td className="p-4">
-                    <div className="flex items-center gap-3">
-                      <Printer className="w-5 h-5 text-gray-400" />
-                      <div>
-                        <div className="font-medium">{printer.name}</div>
-                        <div className="text-sm text-gray-600">{printer.model}</div>
+              {Array.isArray(printers) &&
+                printers.map((printer) => (
+                  <tr key={printer.id} className="border-b hover:bg-gray-50">
+                    <td className="p-4">
+                      <div className="flex items-center gap-3">
+                        <Printer className="w-5 h-5 text-gray-400" />
+                        <div>
+                          <div className="font-medium">{printer.name}</div>
+                          <div className="text-sm text-gray-600">{printer.model}</div>
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-2">
-                      {getTypeIcon(printer.type)}
-                      <span>{printer.type}</span>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <Badge className={`${getStatusColor(printer.status)} text-white`}>{printer.status}</Badge>
-                  </td>
-                  <td className="p-4">
-                    <Badge variant="outline">{printer.sector}</Badge>
-                  </td>
-                  <td className="p-4">
-                    <div className="text-sm text-gray-600">
-                      {printer.type === "USB" ? `Porta: ${printer.port}` : `IP: ${printer.ip}`}
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedPrinter(printer)
-                          setIsDialogOpen(true)
-                        }}
-                      >
-                        <Settings className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => testPrinter(printer)}
-                        disabled={printer.status !== "Conectada"}
-                      >
-                        Testar
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-2">
+                        {getTypeIcon(printer.type)}
+                        <span>{printer.type}</span>
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <Badge className={`${getStatusColor(printer.status)} text-white`}>{printer.status}</Badge>
+                    </td>
+                    <td className="p-4">
+                      <Badge variant="outline">{printer.sector}</Badge>
+                    </td>
+                    <td className="p-4">
+                      <div className="text-sm text-gray-600">
+                        {printer.type === "USB" ? `Porta: ${printer.port}` : `IP: ${printer.ip}`}
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedPrinter(printer)
+                            setIsDialogOpen(true)
+                          }}
+                        >
+                          <Settings className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => testPrinter(printer)}
+                          disabled={printer.status !== "Conectada"}
+                        >
+                          Testar
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeletePrinter(printer.id)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          Excluir
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>

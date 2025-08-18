@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -11,6 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Plus, Search, Edit, Trash2 } from "lucide-react"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationPrevious,
+  PaginationNext,
+} from "@/components/ui/pagination"
 
 interface Product {
   id: string
@@ -19,81 +26,190 @@ interface Product {
   price: number
   description?: string
   image?: string
-  active: boolean
+  on_off: boolean // usando on_off em vez de active para compatibilidade com banco
   complements: string[]
 }
-
-const mockProducts: Product[] = [
-  {
-    id: "1",
-    name: "X-Burger",
-    category: "Hambúrgueres",
-    price: 25.9,
-    description: "Hambúrguer artesanal com carne bovina, queijo, alface e tomate",
-    active: true,
-    complements: ["Bacon", "Queijo extra", "Cebola caramelizada"],
-  },
-  {
-    id: "2",
-    name: "Pizza Margherita",
-    category: "Pizzas",
-    price: 35.0,
-    description: "Pizza tradicional com molho de tomate, mussarela e manjericão",
-    active: true,
-    complements: ["Borda recheada", "Queijo extra"],
-  },
-  {
-    id: "3",
-    name: "Coca-Cola 2L",
-    category: "Bebidas",
-    price: 12.0,
-    active: false,
-    complements: [],
-  },
-]
 
 const categories = ["Hambúrgueres", "Pizzas", "Bebidas", "Sobremesas", "Acompanhamentos"]
 
 export function ProductsScreen() {
-  const [products, setProducts] = useState<Product[]>(mockProducts)
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("todas")
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-
-  const filteredProducts = products.filter((product) => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesCategory = categoryFilter === "todas" || product.category === categoryFilter
-    return matchesSearch && matchesCategory
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0,
   })
 
-  const handleSaveProduct = (productData: Partial<Product>) => {
-    if (selectedProduct) {
-      // Editar produto existente
-      setProducts((prev) => prev.map((p) => (p.id === selectedProduct.id ? { ...p, ...productData } : p)))
-    } else {
-      // Criar novo produto
-      const newProduct: Product = {
-        id: Date.now().toString(),
-        name: productData.name || "",
-        category: productData.category || "",
-        price: productData.price || 0,
-        description: productData.description || "",
-        active: productData.active ?? true,
-        complements: productData.complements || [],
+  const handleSaveProduct = async (data: Partial<Product>) => {
+    try {
+      const method = selectedProduct ? "PUT" : "POST"
+      const url = selectedProduct ? `/api/products/${selectedProduct.id}` : "/api/products"
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      })
+
+      if (response.ok) {
+        // @ts-ignore
+        window.showToast?.({
+          type: "success",
+          title: "Sucesso",
+          description: selectedProduct ? "Produto atualizado com sucesso" : "Produto criado com sucesso",
+        })
+        setIsDialogOpen(false)
+        loadProducts() // Recarregar lista
+      } else {
+        throw new Error("Erro na resposta da API")
       }
-      setProducts((prev) => [...prev, newProduct])
+    } catch (error) {
+      console.error("Erro ao salvar produto:", error)
+      // @ts-ignore
+      window.showToast?.({
+        type: "error",
+        title: "Erro",
+        description: "Erro ao salvar produto. Tente novamente.",
+      })
     }
-    setIsDialogOpen(false)
-    setSelectedProduct(null)
   }
 
-  const handleDeleteProduct = (productId: string) => {
-    setProducts((prev) => prev.filter((p) => p.id !== productId))
+  const toggleProductStatus = async (productId: string) => {
+    try {
+      const product = products.find((p) => p.id === productId)
+      if (!product) return
+
+      const response = await fetch(`/api/products/${productId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...product,
+          on_off: !product.on_off,
+        }),
+      })
+
+      if (response.ok) {
+        // @ts-ignore
+        window.showToast?.({
+          type: "success",
+          title: "Sucesso",
+          description: `Produto ${!product.on_off ? "ativado" : "desativado"} com sucesso`,
+        })
+        loadProducts() // Recarregar lista
+      } else {
+        throw new Error("Erro na resposta da API")
+      }
+    } catch (error) {
+      console.error("Erro ao alterar status do produto:", error)
+      // @ts-ignore
+      window.showToast?.({
+        type: "error",
+        title: "Erro",
+        description: "Erro ao alterar status do produto",
+      })
+    }
   }
 
-  const toggleProductStatus = (productId: string) => {
-    setProducts((prev) => prev.map((p) => (p.id === productId ? { ...p, active: !p.active } : p)))
+  const handleDeleteProduct = async (productId: string) => {
+    if (!confirm("Tem certeza que deseja excluir este produto?")) return
+
+    try {
+      const response = await fetch(`/api/products/${productId}`, {
+        method: "DELETE",
+      })
+
+      if (response.ok) {
+        // @ts-ignore
+        window.showToast?.({
+          type: "success",
+          title: "Sucesso",
+          description: "Produto excluído com sucesso",
+        })
+        loadProducts() // Recarregar lista
+      } else {
+        throw new Error("Erro na resposta da API")
+      }
+    } catch (error) {
+      console.error("Erro ao excluir produto:", error)
+      // @ts-ignore
+      window.showToast?.({
+        type: "error",
+        title: "Erro",
+        description: "Erro ao excluir produto",
+      })
+    }
+  }
+
+  useEffect(() => {
+    loadProducts()
+  }, [currentPage, searchTerm, categoryFilter])
+
+  const loadProducts = async () => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: "10",
+        search: searchTerm,
+        category: categoryFilter !== "todas" ? categoryFilter : "",
+      })
+
+      const response = await fetch(`/api/products?${params}`)
+      if (response.ok) {
+        const result = await response.json()
+        if (result.data && result.pagination) {
+          setProducts(result.data)
+          setPagination(result.pagination)
+        } else {
+          // Fallback para API que retorna array direto
+          setProducts(Array.isArray(result) ? result : [])
+          setPagination({
+            page: 1,
+            limit: 10,
+            total: Array.isArray(result) ? result.length : 0,
+            totalPages: 1,
+          })
+        }
+      } else {
+        // @ts-ignore
+        window.showToast?.({
+          type: "error",
+          title: "Erro",
+          description: "Erro ao carregar produtos",
+        })
+      }
+    } catch (error) {
+      console.error("Erro ao carregar produtos:", error)
+      // @ts-ignore
+      window.showToast?.({
+        type: "error",
+        title: "Erro",
+        description: "Erro ao conectar com o servidor",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredProducts = products
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+      </div>
+    )
   }
 
   return (
@@ -155,21 +271,24 @@ export function ProductsScreen() {
                 <tr key={product.id} className="border-b hover:bg-gray-50">
                   <td className="p-4">
                     <div>
-                      <div className="font-medium">{product.name}</div>
-                      {product.description && (
+                      <div className="font-medium">{product?.name || "Nome não informado"}</div>
+                      {product?.description && (
                         <div className="text-sm text-gray-600 truncate max-w-xs">{product.description}</div>
                       )}
                     </div>
                   </td>
                   <td className="p-4">
-                    <Badge variant="outline">{product.category}</Badge>
+                    <Badge variant="outline">{product?.category || "Sem categoria"}</Badge>
                   </td>
-                  <td className="p-4 font-medium">R$ {product.price.toFixed(2)}</td>
+                  <td className="p-4 font-medium">R$ {(product?.price || 0).toFixed(2)}</td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
-                      <Switch checked={product.active} onCheckedChange={() => toggleProductStatus(product.id)} />
-                      <span className={product.active ? "text-green-600" : "text-gray-400"}>
-                        {product.active ? "Ativo" : "Inativo"}
+                      <Switch
+                        checked={product?.on_off ?? false} // usando on_off em vez de active
+                        onCheckedChange={() => toggleProductStatus(product.id)}
+                      />
+                      <span className={product?.on_off ? "text-green-600" : "text-gray-400"}>
+                        {product?.on_off ? "Ativo" : "Inativo"} // usando on_off em vez de active
                       </span>
                     </div>
                   </td>
@@ -207,6 +326,42 @@ export function ProductsScreen() {
           </div>
         )}
       </div>
+
+      {pagination.totalPages > 1 && (
+        <div className="flex justify-center">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+
+              {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((page) => (
+                <PaginationItem key={page}>
+                  <PaginationLink
+                    onClick={() => setCurrentPage(page)}
+                    isActive={currentPage === page}
+                    className="cursor-pointer"
+                  >
+                    {page}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => setCurrentPage(Math.min(pagination.totalPages, currentPage + 1))}
+                  className={
+                    currentPage === pagination.totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"
+                  }
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
     </div>
   )
 }
@@ -221,17 +376,119 @@ function ProductDialog({
   onClose: () => void
 }) {
   const [formData, setFormData] = useState({
-    name: product?.name || "",
-    category: product?.category || "",
-    price: product?.price || 0,
-    description: product?.description || "",
-    active: product?.active ?? true,
-    complements: product?.complements || [],
+    name: "",
+    category: "",
+    price: 0,
+    description: "",
+    on_off: true, // usando on_off em vez de active
+    complements: [],
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (product) {
+      setFormData({
+        name: product.name || "",
+        category: product.category || "",
+        price: product.price || 0,
+        description: product.description || "",
+        on_off: product.on_off ?? true,
+        complements: product.complements || [],
+      })
+    } else {
+      // Reset form for new product
+      setFormData({
+        name: "",
+        category: "",
+        price: 0,
+        description: "",
+        on_off: true,
+        complements: [],
+      })
+    }
+    setErrors({}) // Clear errors when product changes
+  }, [product])
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {}
+
+    // Validação do nome
+    if (!formData.name.trim()) {
+      newErrors.name = "Nome é obrigatório"
+    } else if (formData.name.trim().length < 2) {
+      newErrors.name = "Nome deve ter pelo menos 2 caracteres"
+    } else if (formData.name.trim().length > 100) {
+      newErrors.name = "Nome deve ter no máximo 100 caracteres"
+    }
+
+    // Validação da categoria
+    if (!formData.category) {
+      newErrors.category = "Categoria é obrigatória"
+    }
+
+    // Validação do preço
+    if (!formData.price || formData.price <= 0) {
+      newErrors.price = "Preço deve ser maior que zero"
+    } else if (formData.price > 9999.99) {
+      newErrors.price = "Preço deve ser menor que R$ 9.999,99"
+    }
+
+    // Validação da descrição (opcional, mas se preenchida deve ter tamanho mínimo)
+    if (formData.description && formData.description.trim().length > 0 && formData.description.trim().length < 10) {
+      newErrors.description = "Descrição deve ter pelo menos 10 caracteres"
+    } else if (formData.description && formData.description.length > 500) {
+      newErrors.description = "Descrição deve ter no máximo 500 caracteres"
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    onSave(formData)
+
+    if (!validateForm()) {
+      // @ts-ignore
+      window.showToast?.({
+        type: "error",
+        title: "Erro de Validação",
+        description: "Por favor, corrija os erros no formulário",
+      })
+      return
+    }
+
+    setIsSubmitting(true)
+
+    try {
+      // Sanitizar dados antes de enviar
+      const sanitizedData = {
+        ...formData,
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        price: Number(formData.price.toFixed(2)), // Garantir 2 casas decimais
+      }
+
+      await onSave(sanitizedData)
+    } catch (error) {
+      console.error("Erro ao salvar produto:", error)
+      // @ts-ignore
+      window.showToast?.({
+        type: "error",
+        title: "Erro",
+        description: "Erro ao salvar produto. Tente novamente.",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleFieldChange = (field: string, value: any) => {
+    setFormData((prev) => ({ ...prev, [field]: value }))
+    if (errors[field]) {
+      setErrors((prev) => ({ ...prev, [field]: "" }))
+    }
   }
 
   return (
@@ -242,21 +499,21 @@ function ProductDialog({
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="text-sm font-medium">Nome</label>
+          <label className="text-sm font-medium">Nome *</label>
           <Input
             value={formData.name}
-            onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-            required
+            onChange={(e) => handleFieldChange("name", e.target.value)}
+            className={errors.name ? "border-red-500" : ""}
+            placeholder="Digite o nome do produto"
+            maxLength={100}
           />
+          {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
         </div>
 
         <div>
-          <label className="text-sm font-medium">Categoria</label>
-          <Select
-            value={formData.category}
-            onValueChange={(value) => setFormData((prev) => ({ ...prev, category: value }))}
-          >
-            <SelectTrigger>
+          <label className="text-sm font-medium">Categoria *</label>
+          <Select value={formData.category} onValueChange={(value) => handleFieldChange("category", value)}>
+            <SelectTrigger className={errors.category ? "border-red-500" : ""}>
               <SelectValue placeholder="Selecione uma categoria" />
             </SelectTrigger>
             <SelectContent>
@@ -267,42 +524,63 @@ function ProductDialog({
               ))}
             </SelectContent>
           </Select>
+          {errors.category && <p className="text-red-500 text-xs mt-1">{errors.category}</p>}
         </div>
 
         <div>
-          <label className="text-sm font-medium">Preço</label>
+          <label className="text-sm font-medium">Preço *</label>
           <Input
             type="number"
             step="0.01"
+            min="0.01"
+            max="9999.99"
             value={formData.price}
-            onChange={(e) => setFormData((prev) => ({ ...prev, price: Number.parseFloat(e.target.value) || 0 }))}
-            required
+            onChange={(e) => handleFieldChange("price", Number.parseFloat(e.target.value) || 0)}
+            className={errors.price ? "border-red-500" : ""}
+            placeholder="0,00"
           />
+          {errors.price && <p className="text-red-500 text-xs mt-1">{errors.price}</p>}
         </div>
 
         <div>
           <label className="text-sm font-medium">Descrição</label>
           <Textarea
             value={formData.description}
-            onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+            onChange={(e) => handleFieldChange("description", e.target.value)}
+            className={errors.description ? "border-red-500" : ""}
             rows={3}
+            placeholder="Descrição opcional do produto"
+            maxLength={500}
           />
+          {errors.description && <p className="text-red-500 text-xs mt-1">{errors.description}</p>}
+          <p className="text-xs text-gray-500 mt-1">{formData.description.length}/500 caracteres</p>
         </div>
 
         <div className="flex items-center gap-2">
-          <Switch
-            checked={formData.active}
-            onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, active: checked }))}
-          />
+          <Switch checked={formData.on_off} onCheckedChange={(checked) => handleFieldChange("on_off", checked)} /> //
+          usando on_off em vez de active
           <label className="text-sm font-medium">Produto ativo</label>
         </div>
 
         <div className="flex gap-2 pt-4">
-          <Button type="button" variant="outline" onClick={onClose} className="flex-1 bg-transparent">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className="flex-1 bg-transparent"
+            disabled={isSubmitting}
+          >
             Cancelar
           </Button>
-          <Button type="submit" className="flex-1">
-            Salvar
+          <Button type="submit" className="flex-1" disabled={isSubmitting}>
+            {isSubmitting ? (
+              <div className="flex items-center gap-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Salvando...
+              </div>
+            ) : (
+              "Salvar"
+            )}
           </Button>
         </div>
       </form>
