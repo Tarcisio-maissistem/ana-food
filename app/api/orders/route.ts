@@ -1,9 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
-import { verifyToken } from "@/lib/auth"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 const supabase = createClient(supabaseUrl, supabaseKey)
 
@@ -42,7 +41,7 @@ async function checkTableExists(): Promise<boolean> {
 function getFallbackOrders(): Order[] {
   return [
     {
-      id: "1",
+      id: "550e8400-e29b-41d4-a716-446655440001",
       number: 1001,
       customerName: "João Silva",
       phone: "(11) 98765-4321",
@@ -59,7 +58,7 @@ function getFallbackOrders(): Order[] {
       estimatedTime: 30,
     },
     {
-      id: "2",
+      id: "550e8400-e29b-41d4-a716-446655440002",
       number: 1002,
       customerName: "Maria Santos",
       phone: "(11) 98765-4322",
@@ -71,7 +70,7 @@ function getFallbackOrders(): Order[] {
       estimatedTime: 20,
     },
     {
-      id: "3",
+      id: "550e8400-e29b-41d4-a716-446655440003",
       number: 1003,
       customerName: "Pedro Costa",
       phone: "(11) 98765-4323",
@@ -116,14 +115,52 @@ function mapDatabaseToOrder(dbOrder: any): Order {
   }
 }
 
+async function getUserByEmail(email: string): Promise<string | null> {
+  try {
+    console.log("[v0] API Orders: Buscando usuário por email:", email)
+    const { data: user, error } = await supabase.from("users").select("id").eq("email", email).single()
+
+    if (error) {
+      console.error("[v0] API Orders: Erro ao buscar usuário:", error)
+      return null
+    }
+
+    console.log("[v0] API Orders: Usuário encontrado:", user?.id)
+    return user?.id || null
+  } catch (error) {
+    console.error("[v0] API Orders: Exceção ao buscar usuário:", error)
+    return null
+  }
+}
+
+function safeVerifyToken(token: string): any {
+  try {
+    // Importação dinâmica para evitar erros de módulo
+    const { verifyToken } = require("@/lib/auth")
+    return verifyToken(token)
+  } catch (error) {
+    console.error("[v0] API Orders: Erro ao verificar token:", error)
+    return null
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
-    let userId = "default-user" // Default user for development
+    console.log("[v0] API Orders: Iniciando busca de pedidos")
+
+    let userId = await getUserByEmail("tarcisiorp16@gmail.com")
+
+    if (!userId) {
+      console.log("[v0] API Orders: Usuário não encontrado, usando fallback")
+      userId = "default-user"
+    }
 
     const authHeader = request.headers.get("authorization")
     if (authHeader?.startsWith("Bearer ")) {
       const token = authHeader.substring(7)
-      const decoded = verifyToken(token)
+      console.log("[v0] API Orders: Token recebido, verificando...")
+
+      const decoded = safeVerifyToken(token)
       if (decoded) {
         userId = decoded.userId
         console.log("[v0] API Orders: Usuário autenticado:", userId)
@@ -131,24 +168,7 @@ export async function GET(request: NextRequest) {
         console.log("[v0] API Orders: Token inválido, usando usuário padrão")
       }
     } else {
-      const userEmail = request.headers.get("x-dev-user-email")
-      if (userEmail === "tarcisiorp16@gmail.com") {
-        // Buscar ID do usuário pelo email
-        try {
-          const supabaseAdmin = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!,
-          )
-          const { data: user } = await supabaseAdmin.from("users").select("id").eq("email", userEmail).single()
-          if (user) {
-            userId = user.id
-            console.log("[v0] API Orders: Usando usuário específico:", userId)
-          }
-        } catch (error) {
-          console.log("[v0] API Orders: Erro ao buscar usuário específico, usando padrão")
-        }
-      }
-      console.log("[v0] API Orders: Sem token, usando usuário:", userId)
+      console.log("[v0] API Orders: Sem token, usando usuário padrão:", userId)
     }
 
     console.log("[v0] API Orders: Buscando pedidos para usuário:", userId)
@@ -161,13 +181,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(getFallbackOrders())
     }
 
-    let query = supabase.from("orders").select("*")
+    let query = supabase.from("orders").select("*").order("created_at", { ascending: false })
 
     if (userId !== "default-user") {
       query = query.eq("user_id", userId)
     }
 
-    const { data: orders, error } = await query.order("created_at", { ascending: false })
+    const { data: orders, error } = await query
 
     if (error) {
       console.error("[v0] API Orders: Erro ao buscar pedidos:", error)
@@ -176,7 +196,7 @@ export async function GET(request: NextRequest) {
     }
 
     const mappedOrders = orders?.map(mapDatabaseToOrder) || []
-    console.log("[v0] API Orders: Retornando", mappedOrders.length, "pedidos para usuário", userId)
+    console.log("[v0] API Orders: Retornando", mappedOrders.length, "pedidos")
 
     if (mappedOrders.length === 0) {
       console.log("[v0] API Orders: Nenhum pedido encontrado, retornando pedidos de exemplo")
@@ -187,24 +207,27 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("[v0] API Orders: Erro na API de pedidos:", error)
     console.log("[v0] API Orders: Retornando pedidos de exemplo devido ao erro")
-    return NextResponse.json(getFallbackOrders())
+    return NextResponse.json(getFallbackOrders(), { status: 200 })
   }
 }
 
 export async function PUT(request: NextRequest) {
   try {
-    let userId = "default-user"
+    console.log("[v0] API Orders: Iniciando atualização de pedido")
+
+    let userId = (await getUserByEmail("tarcisiorp16@gmail.com")) || "default-user"
 
     const authHeader = request.headers.get("authorization")
     if (authHeader?.startsWith("Bearer ")) {
       const token = authHeader.substring(7)
-      const decoded = verifyToken(token)
+      const decoded = safeVerifyToken(token)
       if (decoded) {
         userId = decoded.userId
       }
     }
 
     const { id, status } = await request.json()
+    console.log("[v0] API Orders: Atualizando pedido", id, "para status", status)
 
     const tableExists = await checkTableExists()
 
@@ -222,14 +245,14 @@ export async function PUT(request: NextRequest) {
       .eq("id", id)
 
     if (error) {
-      console.error("Erro ao atualizar pedido:", error)
+      console.error("[v0] API Orders: Erro ao atualizar pedido:", error)
       return NextResponse.json({ success: false, error: error.message }, { status: 400 })
     }
 
     console.log("[v0] API Orders: Pedido", id, "atualizado para status", status)
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Erro na API de pedidos:", error)
+    console.error("[v0] API Orders: Erro na API de atualização:", error)
     return NextResponse.json({ success: false, error: "Erro interno" }, { status: 500 })
   }
 }

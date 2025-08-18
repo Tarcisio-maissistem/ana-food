@@ -196,19 +196,11 @@ export function OrdersKanban() {
     try {
       console.log("[v0] Botão clicado - Atualizando status do pedido:", orderId, "para:", newStatus)
 
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      }
-
-      if (typeof window !== "undefined" && (window as any).devUserId) {
-        headers["x-dev-user-id"] = (window as any).devUserId
-      } else {
-        headers["x-dev-user-email"] = "tarcisiorp16@gmail.com"
-      }
-
       const response = await fetch("/api/orders", {
         method: "PUT",
-        headers,
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({ id: orderId, status: newStatus }),
       })
 
@@ -238,19 +230,7 @@ export function OrdersKanban() {
     try {
       console.log("[v0] OrdersKanban: Carregando pedidos")
       setLoading(true)
-
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      }
-
-      // Adicionar header de usuário específico para desenvolvimento
-      if (typeof window !== "undefined" && (window as any).devUserId) {
-        headers["x-dev-user-id"] = (window as any).devUserId
-      } else {
-        headers["x-dev-user-email"] = "tarcisiorp16@gmail.com"
-      }
-
-      const response = await fetch("/api/orders", { headers })
+      const response = await fetch("/api/orders")
       console.log("[v0] OrdersKanban: Resposta da API recebida, status:", response.status)
 
       if (response.ok) {
@@ -298,17 +278,7 @@ export function OrdersKanban() {
 
   const loadWhatsappAlerts = async () => {
     try {
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      }
-
-      if (typeof window !== "undefined" && (window as any).devUserId) {
-        headers["x-dev-user-id"] = (window as any).devUserId
-      } else {
-        headers["x-dev-user-email"] = "tarcisiorp16@gmail.com"
-      }
-
-      const response = await fetch("/api/whatsapp-alerts", { headers })
+      const response = await fetch("/api/whatsapp-alerts")
       if (response.ok) {
         const alerts = await response.json()
         setWhatsappAlerts(alerts)
