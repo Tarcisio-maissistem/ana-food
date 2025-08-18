@@ -172,6 +172,31 @@ export function OrdersKanban() {
       updateSetting("visible_columns", newVisibleColumns)
       setVisibleColumnsState(newVisibleColumns)
     }
+
+    if (enabled) {
+      const novosOrders = orders.filter((order) => order.status === "novo")
+      if (novosOrders.length > 0) {
+        console.log(
+          "[v0] Movendo",
+          novosOrders.length,
+          "pedidos de 'novo' para 'preparando' devido ao aceite automático",
+        )
+
+        // Atualizar estado local imediatamente
+        setOrders((prev) => prev.map((order) => (order.status === "novo" ? { ...order, status: "preparando" } : order)))
+
+        // Atualizar no backend
+        novosOrders.forEach(async (order) => {
+          try {
+            await updateOrderStatus(order.id, "preparando")
+          } catch (error) {
+            console.error("[v0] Erro ao mover pedido automaticamente:", error)
+          }
+        })
+
+        toast.success(`${novosOrders.length} pedidos aceitos automaticamente`)
+      }
+    }
   }
 
   const setSoundEnabled = (enabled: boolean) => {
@@ -592,14 +617,18 @@ export function OrdersKanban() {
                 >
                   <div className={`${column.color} text-white p-2 rounded-t-lg`}>
                     <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-sm">
-                        {column.title} ({columnOrders.length})
-                      </h3>
-                      <Checkbox
-                        checked={columnOrders.length > 0 && columnOrders.every((order) => selectedOrders.has(order.id))}
-                        onCheckedChange={() => toggleSelectAll(columnOrders)}
-                        className="border-white data-[state=checked]:bg-white data-[state=checked]:text-current"
-                      />
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          checked={
+                            columnOrders.length > 0 && columnOrders.every((order) => selectedOrders.has(order.id))
+                          }
+                          onCheckedChange={() => toggleSelectAll(columnOrders)}
+                          className="border-white data-[state=checked]:bg-white data-[state=checked]:text-current"
+                        />
+                        <h3 className="font-semibold text-sm">
+                          {column.title} ({columnOrders.length})
+                        </h3>
+                      </div>
                     </div>
                   </div>
 
