@@ -1,8 +1,6 @@
 "use client"
 
 import { AuthProvider, useAuth } from "@/contexts/auth-context"
-import { LoginScreen } from "./login-screen"
-import { RegisterScreen } from "./register-screen"
 import { MainDashboard } from "./main-dashboard"
 import { useState } from "react"
 
@@ -10,6 +8,9 @@ function AppContent() {
   const { user, loading } = useAuth()
   const [showRegister, setShowRegister] = useState(false)
 
+  return <MainDashboard />
+
+  /* CÓDIGO DE AUTENTICAÇÃO DESABILITADO TEMPORARIAMENTE
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
@@ -31,6 +32,7 @@ function AppContent() {
   }
 
   return <MainDashboard />
+  */
 }
 
 export function AnaFoodApp() {
