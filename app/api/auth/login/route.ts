@@ -7,6 +7,18 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env
 
 export async function POST(request: NextRequest) {
   try {
+    console.log("[v0] Iniciando processo de login")
+
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      console.error("[v0] NEXT_PUBLIC_SUPABASE_URL não definida")
+      return NextResponse.json({ error: "Configuração do servidor incorreta" }, { status: 500 })
+    }
+
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error("[v0] SUPABASE_SERVICE_ROLE_KEY não definida")
+      return NextResponse.json({ error: "Configuração do servidor incorreta" }, { status: 500 })
+    }
+
     const { email, password } = await request.json()
 
     console.log("[v0] Tentativa de login para:", email)
@@ -15,11 +27,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email e senha são obrigatórios" }, { status: 400 })
     }
 
+    console.log("[v0] Conectando ao Supabase...")
+
     // Buscar usuário no banco
     const { data: user, error } = await supabase.from("users").select("*").eq("email", email).single()
 
     if (error) {
-      console.log("[v0] Erro ao buscar usuário:", error)
+      console.log("[v0] Erro ao buscar usuário:", error.message, error.details, error.hint)
       return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 })
     }
 
@@ -30,7 +44,13 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] Usuário encontrado:", { id: user.id, email: user.email, name: user.name })
 
+    if (!user.password_hash) {
+      console.error("[v0] Password hash não encontrado para o usuário")
+      return NextResponse.json({ error: "Erro na configuração da conta" }, { status: 500 })
+    }
+
     // Verificar senha
+    console.log("[v0] Verificando senha...")
     const isValidPassword = await bcrypt.compare(password, user.password_hash)
 
     if (!isValidPassword) {
@@ -38,6 +58,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 })
     }
 
+    console.log("[v0] Preparando dados do usuário...")
     const authUser: AuthUser = {
       id: user.id,
       email: user.email,
@@ -45,7 +66,10 @@ export async function POST(request: NextRequest) {
       role: user.role || "user",
     }
 
+    console.log("[v0] Gerando access token...")
     const accessToken = generateAccessToken(authUser)
+
+    console.log("[v0] Gerando refresh token...")
     const refreshToken = generateRefreshToken(user.id)
 
     console.log("[v0] Tokens gerados com sucesso")
@@ -69,6 +93,10 @@ export async function POST(request: NextRequest) {
     return response
   } catch (error) {
     console.error("[v0] Erro no login:", error)
+    if (error instanceof Error) {
+      console.error("[v0] Stack trace:", error.stack)
+    }
+
     return NextResponse.json(
       {
         error: "Erro interno do servidor",
