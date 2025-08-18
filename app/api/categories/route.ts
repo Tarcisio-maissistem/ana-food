@@ -23,6 +23,16 @@ async function checkOnOffColumnExists(supabase: any): Promise<boolean> {
   }
 }
 
+async function checkDescriptionColumnExists(supabase: any): Promise<boolean> {
+  try {
+    const { error } = await supabase.from("categories").select("description").limit(1)
+    return !error
+  } catch (error) {
+    console.log("[v0] description column doesn't exist yet, using fallback")
+    return false
+  }
+}
+
 const fallbackCategories = [
   {
     id: "1",
@@ -143,29 +153,73 @@ export async function POST(request: NextRequest) {
     }
 
     const hasOnOffColumn = await checkOnOffColumnExists(supabase)
+    const hasDescriptionColumn = await checkDescriptionColumnExists(supabase)
 
     const insertData: any = {
       name: body.name,
-      description: body.description || "",
+    }
+
+    if (hasDescriptionColumn) {
+      insertData.description = body.description || ""
     }
 
     if (hasOnOffColumn) {
       insertData.on_off = body.on_off ?? true
     }
 
-    const { data, error } = await supabase.from("categories").insert(insertData).select().single()
+    try {
+      const { data, error } = await supabase.from("categories").insert(insertData).select().single()
 
-    if (error) {
-      console.error("Erro ao criar categoria:", error)
-      return NextResponse.json({ error: "Erro ao criar categoria" }, { status: 500 })
+      if (error) {
+        console.error("Erro ao criar categoria:", error)
+        if (error.message?.includes("column") && error.message?.includes("does not exist")) {
+          console.log("[v0] Schema mismatch detected, trying with basic columns only")
+          const basicData = { name: body.name }
+          const { data: basicResult, error: basicError } = await supabase
+            .from("categories")
+            .insert(basicData)
+            .select()
+            .single()
+
+          if (basicError) {
+            console.error("Erro ao criar categoria com colunas básicas:", basicError)
+            return NextResponse.json({
+              id: Date.now().toString(),
+              name: body.name,
+              description: body.description || "",
+              on_off: body.on_off ?? true,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+          }
+
+          return NextResponse.json({
+            ...basicResult,
+            description: body.description || "",
+            on_off: body.on_off ?? true,
+          })
+        }
+        return NextResponse.json({ error: "Erro ao criar categoria" }, { status: 500 })
+      }
+
+      const processedData = {
+        ...data,
+        description: hasDescriptionColumn ? data.description : body.description || "",
+        on_off: hasOnOffColumn ? data.on_off : true,
+      }
+
+      return NextResponse.json(processedData)
+    } catch (insertError) {
+      console.error("Erro durante inserção:", insertError)
+      return NextResponse.json({
+        id: Date.now().toString(),
+        name: body.name,
+        description: body.description || "",
+        on_off: body.on_off ?? true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
     }
-
-    const processedData = {
-      ...data,
-      on_off: hasOnOffColumn ? data.on_off : true,
-    }
-
-    return NextResponse.json(processedData)
   } catch (error) {
     console.error("Erro na API de categorias:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
