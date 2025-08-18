@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, createContext, useContext } from "react"
 import { Sidebar } from "./sidebar"
 import { Topbar } from "./topbar"
 import { OrdersKanban } from "./orders-kanban"
@@ -13,7 +13,27 @@ import { AdditionalsScreen } from "./additionals-screen"
 
 export type Screen = "pedidos" | "produtos" | "clientes" | "impressoras" | "categorias" | "adicionais" | "configuracoes"
 
-export function MainDashboard() {
+interface UserContextType {
+  user: {
+    id: string
+    email: string
+    name: string
+  } | null
+}
+
+const UserContext = createContext<UserContextType>({ user: null })
+
+export const useUser = () => useContext(UserContext)
+
+interface MainDashboardProps {
+  user?: {
+    id: string
+    email: string
+    name: string
+  } | null
+}
+
+export function MainDashboard({ user }: MainDashboardProps) {
   const [currentScreen, setCurrentScreen] = useState<Screen>("pedidos")
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -40,21 +60,23 @@ export function MainDashboard() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar
-        currentScreen={currentScreen}
-        onScreenChange={setCurrentScreen}
-        isOpen={sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
-        isCollapsed={sidebarCollapsed}
-        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-      />
+    <UserContext.Provider value={{ user }}>
+      <div className="flex h-screen bg-gray-50">
+        <Sidebar
+          currentScreen={currentScreen}
+          onScreenChange={setCurrentScreen}
+          isOpen={sidebarOpen}
+          onToggle={() => setSidebarOpen(!sidebarOpen)}
+          isCollapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+        />
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Topbar onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Topbar onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
 
-        <main className="flex-1 overflow-auto p-3 my-0 py-0">{renderScreen()}</main>
+          <main className="flex-1 overflow-auto p-3 my-0 py-0">{renderScreen()}</main>
+        </div>
       </div>
-    </div>
+    </UserContext.Provider>
   )
 }

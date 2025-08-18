@@ -1,5 +1,6 @@
 "use client"
 import { useSettings } from "@/hooks/use-settings"
+import { useUser } from "./main-dashboard" // Importando contexto de usuário
 import type React from "react"
 
 import { useState, useEffect } from "react"
@@ -64,7 +65,8 @@ const statusColumns = [
 ]
 
 export function OrdersKanban() {
-  const { settings, updateSetting, getSetting, loading: settingsLoading } = useSettings()
+  const { user } = useUser() // Obtendo usuário do contexto
+  const { settings, updateSetting, getSetting, loading: settingsLoading } = useSettings(user?.id || "default-user") // Passando userId real para useSettings
   const [orders, setOrders] = useState<Order[]>([])
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [showFilters, setShowFilters] = useState(false)
@@ -225,6 +227,7 @@ export function OrdersKanban() {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
+          "x-user-email": user?.email || "tarcisiorp16@gmail.com", // Adicionando header com email do usuário
         },
         body: JSON.stringify({ id: orderId, status: newStatus }),
       })
@@ -255,7 +258,11 @@ export function OrdersKanban() {
     try {
       console.log("[v0] OrdersKanban: Carregando pedidos")
       setLoading(true)
-      const response = await fetch("/api/orders")
+      const response = await fetch("/api/orders", {
+        headers: {
+          "x-user-email": user?.email || "tarcisiorp16@gmail.com", // Adicionando header com email do usuário
+        },
+      })
       console.log("[v0] OrdersKanban: Resposta da API recebida, status:", response.status)
 
       if (response.ok) {
@@ -303,7 +310,11 @@ export function OrdersKanban() {
 
   const loadWhatsappAlerts = async () => {
     try {
-      const response = await fetch("/api/whatsapp-alerts")
+      const response = await fetch("/api/whatsapp-alerts", {
+        headers: {
+          "x-user-email": user?.email || "tarcisiorp16@gmail.com", // Adicionando header com email do usuário
+        },
+      })
       if (response.ok) {
         const alerts = await response.json()
         setWhatsappAlerts(alerts)

@@ -4,48 +4,30 @@ import { createClient } from "@supabase/supabase-js"
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-const fallbackProducts = [
-  {
-    id: "1",
-    name: "Hambúrguer Clássico",
-    price: 25.9,
-    category: "Hambúrgueres",
-    description: "Hambúrguer com carne, queijo, alface e tomate",
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: "2",
-    name: "Pizza Margherita",
-    price: 35.0,
-    category: "Pizzas",
-    description: "Pizza com molho de tomate, mussarela e manjericão",
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: "3",
-    name: "Refrigerante Lata",
-    price: 5.5,
-    category: "Bebidas",
-    description: "Refrigerante gelado 350ml",
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-]
+async function getUserByEmail(email: string) {
+  try {
+    const supabase = createClient(supabaseUrl, supabaseKey)
+    const { data: user, error } = await supabase.from("users").select("id").eq("email", email).single()
+
+    if (error || !user) {
+      console.log("[v0] Usuário não encontrado:", email)
+      return null
+    }
+
+    return user.id
+  } catch (error) {
+    console.error("[v0] Erro ao buscar usuário:", error)
+    return null
+  }
+}
 
 async function checkTableExists(supabase: any): Promise<boolean> {
   try {
-    // Tenta fazer uma query simples na tabela
     const { data, error } = await supabase.from("products").select("*").limit(1)
-
-    // Se não há erro e a query foi executada, a tabela existe
     if (!error) {
       console.log("Tabela 'products' existe e está acessível")
       return true
     }
-
-    // Se há erro relacionado à tabela não existir
     if (
       error &&
       (error.message.includes("does not exist") ||
@@ -55,8 +37,6 @@ async function checkTableExists(supabase: any): Promise<boolean> {
       console.log("Tabela 'products' não existe:", error.message)
       return false
     }
-
-    // Para outros tipos de erro, assumimos que a tabela existe mas há outro problema
     console.log("Erro ao verificar tabela 'products':", error.message)
     return false
   } catch (error) {
@@ -65,31 +45,62 @@ async function checkTableExists(supabase: any): Promise<boolean> {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const supabase = createClient(supabaseUrl, supabaseKey)
+
+    const userEmail = request.headers.get("x-user-email") || "tarcisiorp16@gmail.com"
+    const userId = await getUserByEmail(userEmail)
+
+    if (!userId) {
+      console.log("[v0] Usuário não encontrado, retornando dados vazios")
+      return NextResponse.json([])
+    }
 
     const tableExists = await checkTableExists(supabase)
 
     if (!tableExists) {
-      console.log("Tabela 'products' não existe, retornando dados temporários")
-      return NextResponse.json(fallbackProducts)
+      console.log("[v0] Tabela 'products' não existe, retornando dados específicos do usuário")
+      const userSpecificProducts = [
+        {
+          id: `${userId}-1`,
+          name: "Hambúrguer Clássico",
+          price: 25.9,
+          category: "Hambúrgueres",
+          description: "Hambúrguer com carne, queijo, alface e tomate",
+          user_id: userId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        {
+          id: `${userId}-2`,
+          name: "Pizza Margherita",
+          price: 35.0,
+          category: "Pizzas",
+          description: "Pizza com molho de tomate, mussarela e manjericão",
+          user_id: userId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ]
+      return NextResponse.json(userSpecificProducts)
     }
 
     const { data: products, error } = await supabase
       .from("products")
       .select("*")
+      .eq("user_id", userId)
       .order("created_at", { ascending: false })
 
     if (error) {
       console.error("Erro ao buscar produtos:", error)
-      return NextResponse.json(fallbackProducts)
+      return NextResponse.json([])
     }
 
     return NextResponse.json(products || [])
   } catch (error) {
     console.error("Erro na API de produtos:", error)
-    return NextResponse.json(fallbackProducts)
+    return NextResponse.json([])
   }
 }
 
@@ -98,30 +109,50 @@ export async function POST(request: NextRequest) {
     const supabase = createClient(supabaseUrl, supabaseKey)
     const body = await request.json()
 
-    console.log("Usando dados de fallback para produtos")
-    const newProduct = {
-      id: Date.now().toString(),
-      name: body.name,
-      price: body.price,
-      category: body.category || "Geral",
-      description: body.description || "",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+    const userEmail = request.headers.get("x-user-email") || "tarcisiorp16@gmail.com"
+    const userId = await getUserByEmail(userEmail)
+
+    if (!userId) {
+      return NextResponse.json({ error: "Usuário não encontrado" }, { status: 401 })
     }
-    return NextResponse.json(newProduct)
+
+    const tableExists = await checkTableExists(supabase)
+
+    if (!tableExists) {
+      const newProduct = {
+        id: `${userId}-${Date.now()}`,
+        name: body.name,
+        price: body.price,
+        category: body.category || "Geral",
+        description: body.description || "",
+        user_id: userId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+      return NextResponse.json(newProduct)
+    }
+
+    const { data, error } = await supabase
+      .from("products")
+      .insert({
+        name: body.name,
+        price: body.price,
+        category: body.category || "Geral",
+        description: body.description || "",
+        user_id: userId,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.error("Erro ao criar produto:", error)
+      return NextResponse.json({ error: "Erro ao criar produto" }, { status: 500 })
+    }
+
+    return NextResponse.json(data)
   } catch (error) {
     console.error("Erro na API de produtos:", error)
-    const body = await request.json()
-    const newProduct = {
-      id: Date.now().toString(),
-      name: body.name,
-      price: body.price,
-      category: body.category || "Geral",
-      description: body.description || "",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
-    return NextResponse.json(newProduct)
+    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
 
@@ -131,23 +162,29 @@ export async function PUT(request: NextRequest) {
     const body = await request.json()
     const { id, ...updateData } = body
 
-    console.log("Usando dados de fallback para atualização de produtos")
-    const updatedProduct = {
-      id,
-      ...updateData,
-      updated_at: new Date().toISOString(),
+    const userEmail = request.headers.get("x-user-email") || "tarcisiorp16@gmail.com"
+    const userId = await getUserByEmail(userEmail)
+
+    if (!userId) {
+      return NextResponse.json({ error: "Usuário não encontrado" }, { status: 401 })
     }
-    return NextResponse.json(updatedProduct)
+
+    const { data, error } = await supabase
+      .from("products")
+      .update({ ...updateData, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error("Erro ao atualizar produto:", error)
+      return NextResponse.json({ error: "Erro ao atualizar produto" }, { status: 500 })
+    }
+
+    return NextResponse.json(data)
   } catch (error) {
     console.error("Erro na API de produtos:", error)
-    const body = await request.json()
-    const { id, ...updateData } = body
-    const updatedProduct = {
-      id,
-      ...updateData,
-      updated_at: new Date().toISOString(),
-    }
-    return NextResponse.json(updatedProduct)
+    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
 
@@ -161,7 +198,20 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "ID do produto é obrigatório" }, { status: 400 })
     }
 
-    console.log("Usando dados de fallback para exclusão de produtos")
+    const userEmail = request.headers.get("x-user-email") || "tarcisiorp16@gmail.com"
+    const userId = await getUserByEmail(userEmail)
+
+    if (!userId) {
+      return NextResponse.json({ error: "Usuário não encontrado" }, { status: 401 })
+    }
+
+    const { error } = await supabase.from("products").delete().eq("id", id).eq("user_id", userId)
+
+    if (error) {
+      console.error("Erro ao excluir produto:", error)
+      return NextResponse.json({ error: "Erro ao excluir produto" }, { status: 500 })
+    }
+
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Erro na API de produtos:", error)
