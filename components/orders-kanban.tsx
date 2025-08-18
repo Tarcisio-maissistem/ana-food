@@ -476,9 +476,6 @@ export function OrdersKanban() {
                 Aceite Automático
               </label>
               <Switch id="auto-accept" checked={autoAccept} onCheckedChange={setAutoAccept} />
-              {autoAccept && (
-                
-              )}
             </div>
 
             <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-lg border">
@@ -933,29 +930,6 @@ export function OrdersKanban() {
                   <span className="font-medium">{selectedOrder.paymentMethod}</span>
                   {selectedOrder.paymentMethod.toLowerCase().includes("crédito") && (
                     <span className="text-sm text-gray-500">(Crédito)</span>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2 mb-3">
-                  {selectedOrder.type === "delivery" ? (
-                    <>
-                      <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                        <Truck className="w-3 h-3 text-white" />
-                      </div>
-                      <span className="font-medium">Delivery</span>
-                      {selectedOrder.deliveryFee && selectedOrder.deliveryFee > 0 && (
-                        <span className="text-sm text-gray-600">
-                          (taxa de: R$ {selectedOrder.deliveryFee.toFixed(2)})
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <div className="w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center">
-                        <Package className="w-3 h-3 text-white" />
-                      </div>
-                      <span className="font-medium">Retirada no local</span>
-                    </>
                   )}
                 </div>
 
