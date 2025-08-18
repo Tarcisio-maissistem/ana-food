@@ -287,9 +287,7 @@ export function ProductsScreen() {
                         checked={product?.on_off ?? false} // usando on_off em vez de active
                         onCheckedChange={() => toggleProductStatus(product.id)}
                       />
-                      <span className={product?.on_off ? "text-green-600" : "text-gray-400"}>
-                        {product?.on_off ? "Ativo" : "Inativo"} // usando on_off em vez de active
-                      </span>
+                      
                     </div>
                   </td>
                   <td className="p-4">
