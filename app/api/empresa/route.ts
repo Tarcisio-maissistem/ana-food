@@ -10,8 +10,29 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl!, supabaseKey!)
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const userEmail = request.headers.get("x-user-email") || "tarcisiorp16@gmail.com"
+    console.log("[v0] API Empresa: Buscando empresa para usuário:", userEmail)
+
+    let userId = null
+    try {
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("email", userEmail)
+        .maybeSingle()
+
+      if (userError) {
+        console.error("[v0] API Empresa: Erro ao buscar usuário:", userError)
+      } else if (userData) {
+        userId = userData.id
+        console.log("[v0] API Empresa: Usuário encontrado:", userId)
+      }
+    } catch (error) {
+      console.log("[v0] API Empresa: Tabela users não existe ou erro na consulta")
+    }
+
     const { error: tableError } = await supabase.from("companies").select("count").limit(1)
 
     if (
@@ -34,13 +55,35 @@ export async function GET() {
       })
     }
 
-    const { data, error } = await supabase.from("companies").select("*").limit(1).single()
+    let query = supabase.from("companies").select("*")
+
+    if (userId) {
+      query = query.eq("user_id", userId)
+    }
+
+    const { data, error } = await query.maybeSingle()
 
     if (error) {
       console.error("Erro ao buscar empresa:", error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    if (!data) {
+      console.log("[v0] API Empresa: Nenhuma empresa encontrada, retornando dados vazios")
+      return NextResponse.json({
+        cnpj: "",
+        name: "",
+        phone: "",
+        address: "",
+        working_hours: "08:00 - 18:00",
+        delivery_time: "30-45 min",
+        minimum_order: 0,
+        notes: "",
+        location_link: "",
+      })
+    }
+
+    console.log("[v0] API Empresa: Empresa encontrada:", data.name)
     return NextResponse.json(data)
   } catch (error) {
     console.error("Erro interno:", error)
