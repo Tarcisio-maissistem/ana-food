@@ -100,6 +100,8 @@ export function verifyRefreshToken(token: string): string | null {
   }
 }
 
+export const verifyToken = verifyAccessToken
+
 export function getAuthUser(request: NextRequest): AuthUser | null {
   const authHeader = request.headers.get("authorization")
 
