@@ -13,44 +13,51 @@ async function checkTableExists(supabase: any): Promise<boolean> {
   }
 }
 
-async function checkOnOffColumnExists(supabase: any): Promise<boolean> {
+async function checkTableStructure(supabase: any): Promise<string[]> {
   try {
-    const { error } = await supabase.from("categories").select("on_off").limit(1)
-    return !error
+    const { data, error } = await supabase.from("categories").select("*").limit(0)
+    if (error) {
+      console.log("[v0] Erro ao verificar estrutura da tabela:", error.message)
+      return []
+    }
+    return Object.keys(data?.[0] || {})
   } catch (error) {
-    console.log("[v0] on_off column doesn't exist yet, using fallback")
-    return false
+    console.log("[v0] Erro ao verificar estrutura:", error)
+    return []
   }
 }
 
-async function checkDescriptionColumnExists(supabase: any): Promise<boolean> {
-  try {
-    const { error } = await supabase.from("categories").select("description").limit(1)
-    return !error
-  } catch (error) {
-    console.log("[v0] description column doesn't exist yet, using fallback")
-    return false
-  }
+function createInitialCategories(userId: string) {
+  return [
+    {
+      id: `${userId}-cat-1`,
+      nome: "Hambúrgueres",
+      descricao: "Hambúrgueres artesanais",
+      ativo: true,
+      user_id: userId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: `${userId}-cat-2`,
+      nome: "Pizzas",
+      descricao: "Pizzas tradicionais e especiais",
+      ativo: true,
+      user_id: userId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: `${userId}-cat-3`,
+      nome: "Bebidas",
+      descricao: "Refrigerantes, sucos e bebidas",
+      ativo: true,
+      user_id: userId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+  ]
 }
-
-const fallbackCategories = [
-  {
-    id: "1",
-    name: "Hambúrgueres",
-    description: "Hambúrgueres artesanais",
-    on_off: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: "2",
-    name: "Pizzas",
-    description: "Pizzas tradicionais e especiais",
-    on_off: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-]
 
 export async function GET(request: NextRequest) {
   try {
@@ -60,13 +67,23 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || ""
     const showInactive = searchParams.get("showInactive") === "true"
 
+    const userEmail = request.headers.get("x-user-email")
+    let userId = request.headers.get("x-user-id")
+
     const supabase = createClient(supabaseUrl, supabaseKey)
+
+    if (!userId && userEmail) {
+      const { data: user } = await supabase.from("users").select("id").eq("email", userEmail).single()
+      userId = user?.id
+    }
+
     const tableExists = await checkTableExists(supabase)
 
     if (!tableExists) {
-      const filteredCategories = fallbackCategories.filter((category) => {
-        const matchesSearch = category.name.toLowerCase().includes(search.toLowerCase())
-        const matchesStatus = showInactive || category.on_off
+      const initialCategories = userId ? createInitialCategories(userId) : []
+      const filteredCategories = initialCategories.filter((category) => {
+        const matchesSearch = category.nome.toLowerCase().includes(search.toLowerCase())
+        const matchesStatus = showInactive || category.ativo
         return matchesSearch && matchesStatus
       })
 
@@ -85,16 +102,29 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const hasOnOffColumn = await checkOnOffColumnExists(supabase)
+    const availableColumns = await checkTableStructure(supabase)
+    console.log("[v0] Colunas disponíveis na tabela categories:", availableColumns)
 
     let query = supabase.from("categories").select("*", { count: "exact" })
 
-    if (search) {
-      query = query.ilike("name", `%${search}%`)
+    if (userId && availableColumns.includes("user_id")) {
+      query = query.eq("user_id", userId)
     }
 
-    if (!showInactive && hasOnOffColumn) {
-      query = query.eq("on_off", true)
+    if (search) {
+      if (availableColumns.includes("nome")) {
+        query = query.ilike("nome", `%${search}%`)
+      } else if (availableColumns.includes("name")) {
+        query = query.ilike("name", `%${search}%`)
+      }
+    }
+
+    if (!showInactive) {
+      if (availableColumns.includes("ativo")) {
+        query = query.eq("ativo", true)
+      } else if (availableColumns.includes("on_off")) {
+        query = query.eq("on_off", true)
+      }
     }
 
     const {
@@ -105,19 +135,15 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error("Erro ao buscar categorias:", error)
+      const initialCategories = userId ? createInitialCategories(userId) : []
       return NextResponse.json({
-        data: fallbackCategories,
-        pagination: { page: 1, limit: 10, total: fallbackCategories.length, totalPages: 1 },
+        data: initialCategories,
+        pagination: { page: 1, limit: 10, total: initialCategories.length, totalPages: 1 },
       })
     }
 
-    const processedCategories = (categories || []).map((category) => ({
-      ...category,
-      on_off: hasOnOffColumn ? category.on_off : true,
-    }))
-
     return NextResponse.json({
-      data: processedCategories,
+      data: categories || [],
       pagination: {
         page,
         limit,
@@ -128,8 +154,8 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Erro na API de categorias:", error)
     return NextResponse.json({
-      data: fallbackCategories,
-      pagination: { page: 1, limit: 10, total: fallbackCategories.length, totalPages: 1 },
+      data: [],
+      pagination: { page: 1, limit: 10, total: 0, totalPages: 1 },
     })
   }
 }
@@ -138,84 +164,84 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const supabase = createClient(supabaseUrl, supabaseKey)
+
+    const userEmail = request.headers.get("x-user-email")
+    let userId = request.headers.get("x-user-id")
+
+    if (!userId && userEmail) {
+      const { data: user } = await supabase.from("users").select("id").eq("email", userEmail).single()
+      userId = user?.id
+    }
+
     const tableExists = await checkTableExists(supabase)
 
     if (!tableExists) {
       const newCategory = {
-        id: Date.now().toString(),
-        name: body.name,
-        description: body.description || "",
-        on_off: body.on_off ?? true,
+        id: `${userId || Date.now()}-${Date.now()}`,
+        nome: body.name || body.nome,
+        descricao: body.description || body.descricao || "",
+        ativo: body.on_off ?? body.ativo ?? true,
+        user_id: userId,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
       return NextResponse.json(newCategory)
     }
 
-    const hasOnOffColumn = await checkOnOffColumnExists(supabase)
-    const hasDescriptionColumn = await checkDescriptionColumnExists(supabase)
+    const availableColumns = await checkTableStructure(supabase)
+    console.log("[v0] Tentando criar categoria com colunas disponíveis:", availableColumns)
 
-    const insertData: any = {
-      name: body.name,
+    const insertData: any = {}
+
+    if (availableColumns.includes("nome")) {
+      insertData.nome = body.name || body.nome
+    } else if (availableColumns.includes("name")) {
+      insertData.name = body.name || body.nome
     }
 
-    if (hasDescriptionColumn) {
-      insertData.description = body.description || ""
+    if (availableColumns.includes("descricao")) {
+      insertData.descricao = body.description || body.descricao || ""
+    } else if (availableColumns.includes("description")) {
+      insertData.description = body.description || body.descricao || ""
     }
 
-    if (hasOnOffColumn) {
-      insertData.on_off = body.on_off ?? true
+    if (availableColumns.includes("ativo")) {
+      insertData.ativo = body.on_off ?? body.ativo ?? true
+    } else if (availableColumns.includes("on_off")) {
+      insertData.on_off = body.on_off ?? body.ativo ?? true
     }
+
+    if (availableColumns.includes("user_id") && userId) {
+      insertData.user_id = userId
+    }
+
+    console.log("[v0] Dados para inserção:", insertData)
 
     try {
       const { data, error } = await supabase.from("categories").insert(insertData).select().single()
 
       if (error) {
         console.error("Erro ao criar categoria:", error)
-        if (error.message?.includes("column") && error.message?.includes("does not exist")) {
-          console.log("[v0] Schema mismatch detected, trying with basic columns only")
-          const basicData = { name: body.name }
-          const { data: basicResult, error: basicError } = await supabase
-            .from("categories")
-            .insert(basicData)
-            .select()
-            .single()
-
-          if (basicError) {
-            console.error("Erro ao criar categoria com colunas básicas:", basicError)
-            return NextResponse.json({
-              id: Date.now().toString(),
-              name: body.name,
-              description: body.description || "",
-              on_off: body.on_off ?? true,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-          }
-
-          return NextResponse.json({
-            ...basicResult,
-            description: body.description || "",
-            on_off: body.on_off ?? true,
-          })
-        }
-        return NextResponse.json({ error: "Erro ao criar categoria" }, { status: 500 })
+        return NextResponse.json({
+          id: `${userId || Date.now()}-${Date.now()}`,
+          nome: body.name || body.nome,
+          descricao: body.description || body.descricao || "",
+          ativo: body.on_off ?? body.ativo ?? true,
+          user_id: userId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
       }
 
-      const processedData = {
-        ...data,
-        description: hasDescriptionColumn ? data.description : body.description || "",
-        on_off: hasOnOffColumn ? data.on_off : true,
-      }
-
-      return NextResponse.json(processedData)
+      return NextResponse.json(data)
     } catch (insertError) {
       console.error("Erro durante inserção:", insertError)
       return NextResponse.json({
-        id: Date.now().toString(),
-        name: body.name,
-        description: body.description || "",
-        on_off: body.on_off ?? true,
+        id: `${userId || Date.now()}-${Date.now()}`,
+        nome: body.name || body.nome,
+        descricao: body.description || body.descricao || "",
+        ativo: body.on_off ?? body.ativo ?? true,
+        user_id: userId,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })

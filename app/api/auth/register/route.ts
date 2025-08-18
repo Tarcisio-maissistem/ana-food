@@ -168,6 +168,116 @@ export async function POST(request: NextRequest) {
 
     await supabase.from("user_settings").insert(defaultSettings)
 
+    try {
+      // Criar categorias iniciais
+      const initialCategories = [
+        {
+          nome: "Hambúrgueres",
+          descricao: "Hambúrgueres artesanais",
+          ativo: true,
+          user_id: user.id,
+        },
+        {
+          nome: "Pizzas",
+          descricao: "Pizzas tradicionais e especiais",
+          ativo: true,
+          user_id: user.id,
+        },
+        {
+          nome: "Bebidas",
+          descricao: "Refrigerantes, sucos e bebidas",
+          ativo: true,
+          user_id: user.id,
+        },
+      ]
+
+      const { data: categories, error: categoriesError } = await supabase
+        .from("categories")
+        .insert(initialCategories)
+        .select()
+
+      if (categoriesError) {
+        console.log("[v0] Erro ao criar categorias iniciais:", categoriesError.message)
+      } else {
+        console.log("[v0] Categorias iniciais criadas:", categories?.length || 0)
+      }
+
+      // Criar produtos iniciais
+      const initialProducts = [
+        {
+          nome: "Hambúrguer Clássico",
+          descricao: "Hambúrguer com carne, queijo, alface e tomate",
+          preco: 25.9,
+          categoria: "Hambúrgueres",
+          ativo: true,
+          user_id: user.id,
+        },
+        {
+          nome: "Pizza Margherita",
+          descricao: "Pizza com molho de tomate, mussarela e manjericão",
+          preco: 32.9,
+          categoria: "Pizzas",
+          ativo: true,
+          user_id: user.id,
+        },
+        {
+          nome: "Refrigerante 350ml",
+          descricao: "Refrigerante gelado 350ml",
+          preco: 5.9,
+          categoria: "Bebidas",
+          ativo: true,
+          user_id: user.id,
+        },
+      ]
+
+      const { data: products, error: productsError } = await supabase.from("products").insert(initialProducts).select()
+
+      if (productsError) {
+        console.log("[v0] Erro ao criar produtos iniciais:", productsError.message)
+      } else {
+        console.log("[v0] Produtos iniciais criados:", products?.length || 0)
+      }
+
+      // Criar adicionais iniciais
+      const initialAdditionals = [
+        {
+          nome: "Bacon",
+          descricao: "Fatias de bacon crocante",
+          preco: 3.5,
+          ativo: true,
+          user_id: user.id,
+        },
+        {
+          nome: "Queijo Extra",
+          descricao: "Porção extra de queijo",
+          preco: 2.5,
+          ativo: true,
+          user_id: user.id,
+        },
+        {
+          nome: "Batata Frita",
+          descricao: "Porção de batata frita",
+          preco: 8.9,
+          ativo: true,
+          user_id: user.id,
+        },
+      ]
+
+      const { data: additionals, error: additionalsError } = await supabase
+        .from("additionals")
+        .insert(initialAdditionals)
+        .select()
+
+      if (additionalsError) {
+        console.log("[v0] Erro ao criar adicionais iniciais:", additionalsError.message)
+      } else {
+        console.log("[v0] Adicionais iniciais criados:", additionals?.length || 0)
+      }
+    } catch (initialDataError) {
+      console.log("[v0] Erro ao criar dados iniciais:", initialDataError)
+      // Não falha o registro se não conseguir criar dados iniciais
+    }
+
     return NextResponse.json({
       message: "Conta criada com sucesso",
       user: {
