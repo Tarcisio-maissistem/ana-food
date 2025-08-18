@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { verifyToken } from "@/lib/auth"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -115,47 +116,71 @@ function mapDatabaseToOrder(dbOrder: any): Order {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    console.log("[v0] API Orders: Iniciando busca de pedidos")
+    const authHeader = request.headers.get("authorization")
+    if (!authHeader?.startsWith("Bearer ")) {
+      console.log("[v0] API Orders: Token de autenticação não fornecido")
+      return NextResponse.json({ error: "Token de autenticação obrigatório" }, { status: 401 })
+    }
+
+    const token = authHeader.substring(7)
+    const decoded = verifyToken(token)
+    if (!decoded) {
+      console.log("[v0] API Orders: Token inválido")
+      return NextResponse.json({ error: "Token inválido" }, { status: 401 })
+    }
+
+    const userId = decoded.userId
+    console.log("[v0] API Orders: Buscando pedidos para usuário:", userId)
+
     const tableExists = await checkTableExists()
     console.log("[v0] API Orders: Tabela orders existe?", tableExists)
 
     if (!tableExists) {
-      console.log("[v0] API Orders: Usando dados de fallback")
-      const fallbackData = getFallbackOrders()
-      console.log("[v0] API Orders: Retornando", fallbackData.length, "pedidos de fallback")
-      return NextResponse.json(fallbackData)
+      console.log("[v0] API Orders: Tabela não existe, retornando array vazio")
+      return NextResponse.json([])
     }
 
-    const { data: orders, error } = await supabase.from("orders").select("*").order("created_at", { ascending: false })
+    const { data: orders, error } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
 
     if (error) {
       console.error("[v0] API Orders: Erro ao buscar pedidos:", error)
-      const fallbackData = getFallbackOrders()
-      console.log("[v0] API Orders: Retornando", fallbackData.length, "pedidos de fallback devido ao erro")
-      return NextResponse.json(fallbackData)
+      return NextResponse.json({ error: "Erro ao buscar pedidos" }, { status: 500 })
     }
 
     const mappedOrders = orders?.map(mapDatabaseToOrder) || []
-    console.log("[v0] API Orders: Retornando", mappedOrders.length, "pedidos do banco de dados")
+    console.log("[v0] API Orders: Retornando", mappedOrders.length, "pedidos do usuário", userId)
     return NextResponse.json(mappedOrders)
   } catch (error) {
     console.error("[v0] API Orders: Erro na API de pedidos:", error)
-    const fallbackData = getFallbackOrders()
-    console.log("[v0] API Orders: Retornando", fallbackData.length, "pedidos de fallback devido à exceção")
-    return NextResponse.json(fallbackData)
+    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
 
 export async function PUT(request: NextRequest) {
   try {
+    const authHeader = request.headers.get("authorization")
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Token de autenticação obrigatório" }, { status: 401 })
+    }
+
+    const token = authHeader.substring(7)
+    const decoded = verifyToken(token)
+    if (!decoded) {
+      return NextResponse.json({ error: "Token inválido" }, { status: 401 })
+    }
+
+    const userId = decoded.userId
     const { id, status } = await request.json()
 
     const tableExists = await checkTableExists()
 
     if (!tableExists) {
-      // Simula sucesso quando a tabela não existe
       return NextResponse.json({ success: true, message: "Status atualizado (simulado)" })
     }
 
@@ -166,12 +191,14 @@ export async function PUT(request: NextRequest) {
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)
+      .eq("user_id", userId) // Garantir que só atualiza pedidos do próprio usuário
 
     if (error) {
       console.error("Erro ao atualizar pedido:", error)
       return NextResponse.json({ success: false, error: error.message }, { status: 400 })
     }
 
+    console.log("[v0] API Orders: Pedido", id, "atualizado para status", status, "pelo usuário", userId)
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Erro na API de pedidos:", error)
