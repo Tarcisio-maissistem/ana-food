@@ -6,7 +6,6 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import {
   Pagination,
@@ -220,7 +219,6 @@ export function CategoriesScreen() {
             <thead className="border-b bg-gray-50">
               <tr>
                 <th className="text-left p-4 font-semibold">Nome</th>
-                <th className="text-left p-4 font-semibold">Descrição</th>
                 <th className="text-left p-4 font-semibold">Status</th>
                 <th className="text-left p-4 font-semibold">Ações</th>
               </tr>
@@ -229,10 +227,7 @@ export function CategoriesScreen() {
               {categories.map((category) => (
                 <tr key={category.id} className="border-b hover:bg-gray-50">
                   <td className="p-4">
-                    <div className="font-medium">{category.name}</div>
-                  </td>
-                  <td className="p-4">
-                    <div className="text-sm text-gray-600 max-w-xs truncate">{category.description || "-"}</div>
+                    <div className="font-medium">{category?.name || category?.id || "Nome não informado"}</div>
                   </td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
@@ -326,9 +321,8 @@ function CategoryDialog({
   onClose: () => void
 }) {
   const [formData, setFormData] = useState({
-    name: category?.name || "",
-    description: category?.description || "",
-    on_off: category?.on_off ?? true,
+    name: "",
+    on_off: true,
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -336,14 +330,12 @@ function CategoryDialog({
   useEffect(() => {
     if (category) {
       setFormData({
-        name: category.name || "",
-        description: category.description || "",
+        name: category.name || category.id || "",
         on_off: category.on_off ?? true,
       })
     } else {
       setFormData({
         name: "",
-        description: "",
         on_off: true,
       })
     }
@@ -355,6 +347,10 @@ function CategoryDialog({
 
     if (!formData.name.trim()) {
       newErrors.name = "Nome é obrigatório"
+    } else if (formData.name.trim().length < 2) {
+      newErrors.name = "Nome deve ter pelo menos 2 caracteres"
+    } else if (formData.name.trim().length > 50) {
+      newErrors.name = "Nome deve ter no máximo 50 caracteres"
     }
 
     setErrors(newErrors)
@@ -364,7 +360,11 @@ function CategoryDialog({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (validateForm()) {
-      onSave(formData)
+      const sanitizedData = {
+        ...formData,
+        name: formData.name.trim(),
+      }
+      onSave(sanitizedData)
     }
   }
 
@@ -381,17 +381,10 @@ function CategoryDialog({
             value={formData.name}
             onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
             className={errors.name ? "border-red-500" : ""}
+            placeholder="Digite o nome da categoria"
+            maxLength={50}
           />
           {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
-        </div>
-
-        <div>
-          <label className="text-sm font-medium">Descrição</label>
-          <Textarea
-            value={formData.description}
-            onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-            rows={3}
-          />
         </div>
 
         <div className="flex items-center gap-2">

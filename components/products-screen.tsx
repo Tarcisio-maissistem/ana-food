@@ -32,6 +32,21 @@ interface Product {
 
 const categories = ["Hambúrgueres", "Pizzas", "Bebidas", "Sobremesas", "Acompanhamentos"]
 
+const formatCurrency = (value: string | number): string => {
+  const numValue =
+    typeof value === "string" ? Number.parseFloat(value.replace(/[^\d,.-]/g, "").replace(",", ".")) : value
+  if (isNaN(numValue)) return "R$ 0,00"
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(numValue)
+}
+
+const parseCurrency = (value: string): number => {
+  const cleaned = value.replace(/[^\d,]/g, "").replace(",", ".")
+  return Number.parseFloat(cleaned) || 0
+}
+
 export function ProductsScreen() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -172,7 +187,6 @@ export function ProductsScreen() {
           setProducts(result.data)
           setPagination(result.pagination)
         } else {
-          // Fallback para API que retorna array direto
           setProducts(Array.isArray(result) ? result : [])
           setPagination({
             page: 1,
@@ -280,7 +294,7 @@ export function ProductsScreen() {
                   <td className="p-4">
                     <Badge variant="outline">{product?.category || "Sem categoria"}</Badge>
                   </td>
-                  <td className="p-4 font-medium">R$ {(product?.price || 0).toFixed(2)}</td>
+                  <td className="p-4 font-medium">{formatCurrency(product?.price || 0)}</td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
                       <Switch
@@ -386,6 +400,7 @@ function ProductDialog({
 
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [priceDisplay, setPriceDisplay] = useState("")
 
   useEffect(() => {
     if (product) {
@@ -397,8 +412,8 @@ function ProductDialog({
         on_off: product.on_off ?? true,
         complements: product.complements || [],
       })
+      setPriceDisplay(formatCurrency(product.price || 0))
     } else {
-      // Reset form for new product
       setFormData({
         name: "",
         category: "",
@@ -407,9 +422,34 @@ function ProductDialog({
         on_off: true,
         complements: [],
       })
+      setPriceDisplay("")
     }
-    setErrors({}) // Clear errors when product changes
+    setErrors({})
   }, [product])
+
+  const handlePriceChange = (value: string) => {
+    // Remove all non-numeric characters except comma and dot
+    const cleaned = value.replace(/[^\d,]/g, "")
+
+    // Convert to number for internal state
+    const numValue = parseCurrency(cleaned)
+    setFormData((prev) => ({ ...prev, price: numValue }))
+
+    // Format for display
+    if (cleaned) {
+      const formatted = formatCurrency(numValue)
+      setPriceDisplay(formatted)
+    } else {
+      setPriceDisplay("")
+    }
+  }
+
+  const handleFieldChange = (field: string, value: any) => {
+    setFormData((prev) => ({ ...prev, [field]: value }))
+    if (errors[field]) {
+      setErrors((prev) => ({ ...prev, [field]: "" }))
+    }
+  }
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -484,13 +524,6 @@ function ProductDialog({
     }
   }
 
-  const handleFieldChange = (field: string, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
-    if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: "" }))
-    }
-  }
-
   return (
     <DialogContent className="max-w-md">
       <DialogHeader>
@@ -530,14 +563,11 @@ function ProductDialog({
         <div>
           <label className="text-sm font-medium">Preço *</label>
           <Input
-            type="number"
-            step="0.01"
-            min="0.01"
-            max="9999.99"
-            value={formData.price}
-            onChange={(e) => handleFieldChange("price", Number.parseFloat(e.target.value) || 0)}
+            type="text"
+            value={priceDisplay}
+            onChange={(e) => handlePriceChange(e.target.value)}
             className={errors.price ? "border-red-500" : ""}
-            placeholder="0,00"
+            placeholder="R$ 0,00"
           />
           {errors.price && <p className="text-red-500 text-xs mt-1">{errors.price}</p>}
         </div>
@@ -557,8 +587,7 @@ function ProductDialog({
         </div>
 
         <div className="flex items-center gap-2">
-          <Switch checked={formData.on_off} onCheckedChange={(checked) => handleFieldChange("on_off", checked)} /> //
-          usando on_off em vez de active
+          <Switch checked={formData.on_off} onCheckedChange={(checked) => handleFieldChange("on_off", checked)} />
           <label className="text-sm font-medium">Produto ativo</label>
         </div>
 

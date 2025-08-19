@@ -16,7 +16,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination"
-import { Search, MessageCircle, Edit, Phone, Plus, Trash2 } from "lucide-react"
+import { Search, MessageCircle, Edit, Phone, Plus, Trash2, History } from "lucide-react"
 
 interface Customer {
   id: string
@@ -28,6 +28,26 @@ interface Customer {
   on_off?: boolean
   created_at?: string
   updated_at?: string
+}
+
+interface OrderHistory {
+  id: string
+  order_number: string
+  date: string
+  total: number
+  status: string
+}
+
+const formatPhone = (value: string): string => {
+  const cleaned = value.replace(/\D/g, "")
+  if (cleaned.length <= 10) {
+    return cleaned.replace(/(\d{2})(\d{4})(\d{4})/, "($1) $2-$3")
+  }
+  return cleaned.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3")
+}
+
+const parsePhone = (value: string): string => {
+  return value.replace(/\D/g, "")
 }
 
 export function CustomersScreen() {
@@ -43,6 +63,11 @@ export function CustomersScreen() {
     total: 0,
     totalPages: 0,
   })
+
+  const [orderHistoryDialog, setOrderHistoryDialog] = useState(false)
+  const [selectedCustomerHistory, setSelectedCustomerHistory] = useState<Customer | null>(null)
+  const [orderHistory, setOrderHistory] = useState<OrderHistory[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
 
   useEffect(() => {
     loadCustomers()
@@ -81,6 +106,40 @@ export function CustomersScreen() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const loadOrderHistory = async (customerId: string) => {
+    setLoadingHistory(true)
+    try {
+      const response = await fetch(`/api/customers/${customerId}/orders`)
+      if (response.ok) {
+        const orders = await response.json()
+        setOrderHistory(orders)
+      } else {
+        // @ts-ignore
+        window.showToast?.({
+          type: "error",
+          title: "Erro",
+          description: "Erro ao carregar histórico de pedidos",
+        })
+      }
+    } catch (error) {
+      console.error("Erro ao carregar histórico:", error)
+      // @ts-ignore
+      window.showToast?.({
+        type: "error",
+        title: "Erro",
+        description: "Erro ao conectar com o servidor",
+      })
+    } finally {
+      setLoadingHistory(false)
+    }
+  }
+
+  const showOrderHistory = (customer: Customer) => {
+    setSelectedCustomerHistory(customer)
+    setOrderHistoryDialog(true)
+    loadOrderHistory(customer.id)
   }
 
   const handleSaveCustomer = async (customerData: Partial<Customer>) => {
@@ -245,7 +304,6 @@ export function CustomersScreen() {
                 <th className="text-left p-4 font-semibold">Cliente</th>
                 <th className="text-left p-4 font-semibold">Telefone</th>
                 <th className="text-left p-4 font-semibold">Email</th>
-                <th className="text-left p-4 font-semibold">Observações</th>
                 <th className="text-left p-4 font-semibold">Status</th>
                 <th className="text-left p-4 font-semibold">Ações</th>
               </tr>
@@ -264,14 +322,11 @@ export function CustomersScreen() {
                   <td className="p-4">
                     <div className="flex items-center gap-2">
                       <Phone className="w-4 h-4 text-gray-400" />
-                      <span className="font-mono text-sm">{customer.phone}</span>
+                      <span className="font-mono text-sm">{formatPhone(customer.phone)}</span>
                     </div>
                   </td>
                   <td className="p-4">
                     <span className="text-sm">{customer.email || "-"}</span>
-                  </td>
-                  <td className="p-4 max-w-xs">
-                    <div className="text-sm text-gray-600 truncate">{customer.notes || "-"}</div>
                   </td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
@@ -286,6 +341,15 @@ export function CustomersScreen() {
                   </td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => showOrderHistory(customer)}
+                        className="text-blue-600 hover:text-blue-700"
+                        title="Histórico de Pedidos"
+                      >
+                        <History className="w-4 h-4" />
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
@@ -326,6 +390,66 @@ export function CustomersScreen() {
           </div>
         )}
       </div>
+
+      <Dialog open={orderHistoryDialog} onOpenChange={setOrderHistoryDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Histórico de Pedidos - {selectedCustomerHistory?.name}</DialogTitle>
+          </DialogHeader>
+
+          {loadingHistory ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+            </div>
+          ) : (
+            <div className="max-h-96 overflow-y-auto">
+              <table className="w-full">
+                <thead className="border-b bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="text-left p-3 font-semibold">ID</th>
+                    <th className="text-left p-3 font-semibold">Data</th>
+                    <th className="text-left p-3 font-semibold">Valor Total</th>
+                    <th className="text-left p-3 font-semibold">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orderHistory.map((order) => (
+                    <tr key={order.id} className="border-b hover:bg-gray-50">
+                      <td className="p-3 font-mono text-sm">{order.order_number}</td>
+                      <td className="p-3">{new Date(order.date).toLocaleDateString("pt-BR")}</td>
+                      <td className="p-3 font-medium">
+                        {new Intl.NumberFormat("pt-BR", {
+                          style: "currency",
+                          currency: "BRL",
+                        }).format(order.total)}
+                      </td>
+                      <td className="p-3">
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            order.status === "concluido"
+                              ? "bg-green-100 text-green-800"
+                              : order.status === "cancelado"
+                                ? "bg-red-100 text-red-800"
+                                : "bg-yellow-100 text-yellow-800"
+                          }`}
+                        >
+                          {order.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {orderHistory.length === 0 && (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">Nenhum pedido encontrado</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {pagination.totalPages > 1 && (
         <div className="flex justify-center">
@@ -376,15 +500,16 @@ function CustomerDialog({
   onClose: () => void
 }) {
   const [formData, setFormData] = useState({
-    name: customer?.name || "",
-    phone: customer?.phone || "",
-    address: customer?.address || "",
-    email: customer?.email || "",
-    notes: customer?.notes || "",
-    on_off: customer?.on_off ?? true,
+    name: "",
+    phone: "",
+    address: "",
+    email: "",
+    notes: "",
+    on_off: true,
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [phoneDisplay, setPhoneDisplay] = useState("")
 
   useEffect(() => {
     if (customer) {
@@ -396,6 +521,7 @@ function CustomerDialog({
         notes: customer.notes || "",
         on_off: customer.on_off ?? true,
       })
+      setPhoneDisplay(formatPhone(customer.phone || ""))
     } else {
       setFormData({
         name: "",
@@ -405,19 +531,34 @@ function CustomerDialog({
         notes: "",
         on_off: true,
       })
+      setPhoneDisplay("")
     }
     setErrors({})
   }, [customer])
+
+  const handlePhoneChange = (value: string) => {
+    const cleaned = parsePhone(value)
+    setFormData((prev) => ({ ...prev, phone: cleaned }))
+    setPhoneDisplay(formatPhone(value))
+  }
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
     if (!formData.name.trim()) {
       newErrors.name = "Nome é obrigatório"
+    } else if (formData.name.trim().length < 2) {
+      newErrors.name = "Nome deve ter pelo menos 2 caracteres"
     }
 
     if (!formData.phone.trim()) {
       newErrors.phone = "Telefone é obrigatório"
+    } else if (formData.phone.length < 10 || formData.phone.length > 11) {
+      newErrors.phone = "Telefone deve ter 10 ou 11 dígitos"
+    }
+
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = "Email inválido"
     }
 
     setErrors(newErrors)
@@ -427,7 +568,14 @@ function CustomerDialog({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (validateForm()) {
-      onSave(formData)
+      const sanitizedData = {
+        ...formData,
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        address: formData.address.trim(),
+        notes: formData.notes.trim(),
+      }
+      onSave(sanitizedData)
     }
   }
 
@@ -444,6 +592,7 @@ function CustomerDialog({
             value={formData.name}
             onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
             className={errors.name ? "border-red-500" : ""}
+            placeholder="Digite o nome do cliente"
           />
           {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
         </div>
@@ -451,9 +600,11 @@ function CustomerDialog({
         <div>
           <label className="text-sm font-medium">Telefone *</label>
           <Input
-            value={formData.phone}
-            onChange={(e) => setFormData((prev) => ({ ...prev, phone: e.target.value }))}
+            value={phoneDisplay}
+            onChange={(e) => handlePhoneChange(e.target.value)}
             className={errors.phone ? "border-red-500" : ""}
+            placeholder="(99) 99999-9999"
+            maxLength={15}
           />
           {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
         </div>
@@ -464,7 +615,10 @@ function CustomerDialog({
             type="email"
             value={formData.email}
             onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
+            className={errors.email ? "border-red-500" : ""}
+            placeholder="email@exemplo.com"
           />
+          {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
         </div>
 
         <div>
@@ -472,6 +626,7 @@ function CustomerDialog({
           <Input
             value={formData.address}
             onChange={(e) => setFormData((prev) => ({ ...prev, address: e.target.value }))}
+            placeholder="Endereço completo"
           />
         </div>
 
@@ -481,6 +636,7 @@ function CustomerDialog({
             value={formData.notes}
             onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
             rows={3}
+            placeholder="Observações sobre o cliente"
           />
         </div>
 

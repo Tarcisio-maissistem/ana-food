@@ -6,7 +6,6 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import {
   Pagination,
@@ -26,6 +25,21 @@ interface Additional {
   on_off: boolean
   created_at?: string
   updated_at?: string
+}
+
+const formatCurrency = (value: string | number): string => {
+  const numValue =
+    typeof value === "string" ? Number.parseFloat(value.replace(/[^\d,.-]/g, "").replace(",", ".")) : value
+  if (isNaN(numValue)) return "R$ 0,00"
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(numValue)
+}
+
+const parseCurrency = (value: string): number => {
+  const cleaned = value.replace(/[^\d,]/g, "").replace(",", ".")
+  return Number.parseFloat(cleaned) || 0
 }
 
 export function AdditionalsScreen() {
@@ -222,7 +236,6 @@ export function AdditionalsScreen() {
               <tr>
                 <th className="text-left p-4 font-semibold">Nome</th>
                 <th className="text-left p-4 font-semibold">Preço</th>
-                <th className="text-left p-4 font-semibold">Descrição</th>
                 <th className="text-left p-4 font-semibold">Status</th>
                 <th className="text-left p-4 font-semibold">Ações</th>
               </tr>
@@ -231,12 +244,9 @@ export function AdditionalsScreen() {
               {additionals.map((additional) => (
                 <tr key={additional.id} className="border-b hover:bg-gray-50">
                   <td className="p-4">
-                    <div className="font-medium">{additional.name}</div>
+                    <div className="font-medium">{additional?.name || additional?.id || "Nome não informado"}</div>
                   </td>
-                  <td className="p-4 font-medium">R$ {additional.price.toFixed(2)}</td>
-                  <td className="p-4">
-                    <div className="text-sm text-gray-600 max-w-xs truncate">{additional.description || "-"}</div>
-                  </td>
+                  <td className="p-4 font-medium">{formatCurrency(additional?.price || 0)}</td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
                       <Switch
@@ -332,42 +342,61 @@ function AdditionalDialog({
   onClose: () => void
 }) {
   const [formData, setFormData] = useState({
-    name: additional?.name || "",
-    price: additional?.price || 0,
-    description: additional?.description || "",
-    on_off: additional?.on_off ?? true,
+    name: "",
+    price: 0,
+    on_off: true,
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [priceDisplay, setPriceDisplay] = useState("")
 
   useEffect(() => {
     if (additional) {
       setFormData({
-        name: additional.name || "",
+        name: additional.name || additional.id || "",
         price: additional.price || 0,
-        description: additional.description || "",
         on_off: additional.on_off ?? true,
       })
+      setPriceDisplay(formatCurrency(additional.price || 0))
     } else {
       setFormData({
         name: "",
         price: 0,
-        description: "",
         on_off: true,
       })
+      setPriceDisplay("")
     }
     setErrors({})
   }, [additional])
+
+  const handlePriceChange = (value: string) => {
+    const cleaned = value.replace(/[^\d,]/g, "")
+    const numValue = parseCurrency(cleaned)
+    setFormData((prev) => ({ ...prev, price: numValue }))
+
+    if (cleaned) {
+      const formatted = formatCurrency(numValue)
+      setPriceDisplay(formatted)
+    } else {
+      setPriceDisplay("")
+    }
+  }
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
     if (!formData.name.trim()) {
       newErrors.name = "Nome é obrigatório"
+    } else if (formData.name.trim().length < 2) {
+      newErrors.name = "Nome deve ter pelo menos 2 caracteres"
+    } else if (formData.name.trim().length > 50) {
+      newErrors.name = "Nome deve ter no máximo 50 caracteres"
     }
 
     if (!formData.price || formData.price <= 0) {
       newErrors.price = "Preço deve ser maior que zero"
+    } else if (formData.price > 9999.99) {
+      newErrors.price = "Preço deve ser menor que R$ 9.999,99"
     }
 
     setErrors(newErrors)
@@ -377,7 +406,12 @@ function AdditionalDialog({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (validateForm()) {
-      onSave(formData)
+      const sanitizedData = {
+        ...formData,
+        name: formData.name.trim(),
+        price: Number(formData.price.toFixed(2)),
+      }
+      onSave(sanitizedData)
     }
   }
 
@@ -394,6 +428,8 @@ function AdditionalDialog({
             value={formData.name}
             onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
             className={errors.name ? "border-red-500" : ""}
+            placeholder="Digite o nome do adicional"
+            maxLength={50}
           />
           {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
         </div>
@@ -401,23 +437,13 @@ function AdditionalDialog({
         <div>
           <label className="text-sm font-medium">Preço *</label>
           <Input
-            type="number"
-            step="0.01"
-            min="0.01"
-            value={formData.price}
-            onChange={(e) => setFormData((prev) => ({ ...prev, price: Number.parseFloat(e.target.value) || 0 }))}
+            type="text"
+            value={priceDisplay}
+            onChange={(e) => handlePriceChange(e.target.value)}
             className={errors.price ? "border-red-500" : ""}
+            placeholder="R$ 0,00"
           />
           {errors.price && <p className="text-red-500 text-xs mt-1">{errors.price}</p>}
-        </div>
-
-        <div>
-          <label className="text-sm font-medium">Descrição</label>
-          <Textarea
-            value={formData.description}
-            onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-            rows={3}
-          />
         </div>
 
         <div className="flex items-center gap-2">
