@@ -180,7 +180,12 @@ export function ProductsScreen() {
         category: categoryFilter !== "todas" ? categoryFilter : "",
       })
 
-      const response = await fetch(`/api/products?${params}`)
+      const response = await fetch(`/api/products?${params}`, {
+        headers: {
+          "X-User-Email": "tarcisiorp16@gmail.com",
+        },
+      })
+
       if (response.ok) {
         const result = await response.json()
         if (result.data && result.pagination) {
@@ -428,20 +433,25 @@ function ProductDialog({
   }, [product])
 
   const handlePriceChange = (value: string) => {
-    // Remove all non-numeric characters except comma and dot
-    const cleaned = value.replace(/[^\d,]/g, "")
+    const cleaned = value.replace(/[^\d]/g, "")
 
-    // Convert to number for internal state
-    const numValue = parseCurrency(cleaned)
+    if (cleaned.length === 0) {
+      setPriceDisplay("")
+      setFormData((prev) => ({ ...prev, price: 0 }))
+      return
+    }
+
+    // Convert cents to reais (last 2 digits are cents)
+    const numValue = Number.parseInt(cleaned) / 100
     setFormData((prev) => ({ ...prev, price: numValue }))
 
     // Format for display
-    if (cleaned) {
-      const formatted = formatCurrency(numValue)
-      setPriceDisplay(formatted)
-    } else {
-      setPriceDisplay("")
-    }
+    const formatted = new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(numValue)
+
+    setPriceDisplay(formatted)
   }
 
   const handleFieldChange = (field: string, value: any) => {

@@ -24,6 +24,8 @@ interface Category {
   on_off: boolean
   created_at?: string
   updated_at?: string
+  nome?: string
+  title?: string
 }
 
 export function CategoriesScreen() {
@@ -53,7 +55,11 @@ export function CategoriesScreen() {
         search: searchTerm,
       })
 
-      const response = await fetch(`/api/categories?${params}`)
+      const response = await fetch(`/api/categories?${params}`, {
+        headers: {
+          "X-User-Email": "tarcisiorp16@gmail.com",
+        },
+      })
       if (response.ok) {
         const result = await response.json()
         setCategories(result.data || [])
@@ -71,7 +77,10 @@ export function CategoriesScreen() {
       if (selectedCategory) {
         const response = await fetch("/api/categories", {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "X-User-Email": "tarcisiorp16@gmail.com",
+          },
           body: JSON.stringify({ id: selectedCategory.id, ...categoryData }),
         })
 
@@ -88,7 +97,10 @@ export function CategoriesScreen() {
       } else {
         const response = await fetch("/api/categories", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "X-User-Email": "tarcisiorp16@gmail.com",
+          },
           body: JSON.stringify(categoryData),
         })
 
@@ -227,7 +239,13 @@ export function CategoriesScreen() {
               {categories.map((category) => (
                 <tr key={category.id} className="border-b hover:bg-gray-50">
                   <td className="p-4">
-                    <div className="font-medium">{category?.name || category?.id || "Nome não informado"}</div>
+                    <div className="font-medium">
+                      {category?.name ||
+                        category?.nome ||
+                        category?.title ||
+                        `Categoria ${category.id}` ||
+                        "Nome não informado"}
+                    </div>
                   </td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
@@ -330,7 +348,7 @@ function CategoryDialog({
   useEffect(() => {
     if (category) {
       setFormData({
-        name: category.name || category.id || "",
+        name: category.name || category.nome || category.title || category.id || "",
         on_off: category.on_off ?? true,
       })
     } else {

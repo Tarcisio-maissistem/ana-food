@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Building2, Save, RefreshCw, Upload, ImageIcon, X, Lock } from "lucide-react"
-import { getEmpresa, updateEmpresa, formatCNPJ, formatTelefone, type EmpresaData } from "@/utils/cache-empresa"
+import { formatCNPJ, formatTelefone, type EmpresaData } from "@/utils/cache-empresa"
 
 export function EstabelecimentoScreen() {
   const [empresa, setEmpresa] = useState<EmpresaData | null>(null)
@@ -43,31 +43,42 @@ export function EstabelecimentoScreen() {
     setLoading(true)
     try {
       console.log("Carregando dados da empresa...")
-      const data = await getEmpresa()
-      console.log("Dados recebidos:", data)
+      const response = await fetch("/api/companies", {
+        headers: {
+          "X-User-Email": "tarcisiorp16@gmail.com",
+        },
+      })
 
-      if (data) {
-        setEmpresa(data)
-        setFormData({
-          nome: data.name || data.nome || "",
-          cnpj: data.cnpj || "",
-          telefone: data.phone || data.telefone || "",
-          endereco: data.address || data.endereco || "",
-          email: data.email || "",
-        })
-        console.log("FormData atualizado:", {
-          nome: data.name || data.nome || "",
-          cnpj: data.cnpj || "",
-          telefone: data.phone || data.telefone || "",
-          endereco: data.address || data.endereco || "",
-          email: data.email || "",
-        })
-      } else {
-        console.log("Nenhum dado encontrado, usando CNPJ padrão")
-        setFormData((prev) => ({
-          ...prev,
-          cnpj: "12345678000199", // CNPJ padrão para configuração inicial
-        }))
+      if (response.ok) {
+        const data = await response.json()
+        console.log("Dados recebidos:", data)
+
+        if (data && (data.name || data.cnpj)) {
+          setEmpresa(data)
+          setFormData({
+            nome: data.name || "",
+            cnpj: data.cnpj || "",
+            telefone: data.phone || "",
+            endereco: data.address || "",
+            email: data.email || "",
+          })
+          console.log("FormData atualizado:", {
+            nome: data.name || "",
+            cnpj: data.cnpj || "",
+            telefone: data.phone || "",
+            endereco: data.address || "",
+            email: data.email || "",
+          })
+        } else {
+          console.log("Nenhum dado encontrado, usando dados vazios")
+          setFormData({
+            nome: "",
+            cnpj: "",
+            telefone: "",
+            endereco: "",
+            email: "",
+          })
+        }
       }
     } catch (error) {
       console.error("Erro ao carregar dados da empresa:", error)
@@ -154,8 +165,23 @@ export function EstabelecimentoScreen() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      const updated = await updateEmpresa(formData)
-      if (updated) {
+      const response = await fetch("/api/companies", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Email": "tarcisiorp16@gmail.com",
+        },
+        body: JSON.stringify({
+          name: formData.nome,
+          cnpj: formData.cnpj,
+          phone: formData.telefone,
+          address: formData.endereco,
+          email: formData.email,
+        }),
+      })
+
+      if (response.ok) {
+        const updated = await response.json()
         setEmpresa(updated)
         // @ts-ignore
         window.showToast?.({
@@ -163,6 +189,8 @@ export function EstabelecimentoScreen() {
           title: "Sucesso",
           description: "Dados da empresa salvos com sucesso!",
         })
+      } else {
+        throw new Error("Erro na resposta da API")
       }
     } catch (error) {
       console.error("Erro ao salvar dados da empresa:", error)
