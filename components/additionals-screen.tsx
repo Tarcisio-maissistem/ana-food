@@ -55,6 +55,7 @@ export function AdditionalsScreen() {
     total: 0,
     totalPages: 0,
   })
+  const [isSaving, setIsSaving] = useState(false) // Added loading state for save operations to prevent double-click
 
   useEffect(() => {
     loadAdditionals()
@@ -87,6 +88,9 @@ export function AdditionalsScreen() {
   }
 
   const handleSaveAdditional = async (additionalData: Partial<Additional>) => {
+    if (isSaving) return // Prevent double-click
+    setIsSaving(true)
+
     try {
       if (selectedAdditional) {
         const response = await fetch("/api/additionals", {
@@ -140,6 +144,8 @@ export function AdditionalsScreen() {
         title: "Erro",
         description: "Erro ao salvar adicional",
       })
+    } finally {
+      setIsSaving(false) // Re-enable button after operation
     }
   }
 
@@ -228,6 +234,7 @@ export function AdditionalsScreen() {
             additional={selectedAdditional}
             onSave={handleSaveAdditional}
             onClose={() => setIsDialogOpen(false)}
+            isLoading={isSaving} // Pass loading state to dialog
           />
         </Dialog>
       </div>
@@ -352,10 +359,12 @@ function AdditionalDialog({
   additional,
   onSave,
   onClose,
+  isLoading,
 }: {
   additional: Additional | null
   onSave: (data: Partial<Additional>) => void
   onClose: () => void
+  isLoading?: boolean // Added loading prop
 }) {
   const [formData, setFormData] = useState({
     name: "",
@@ -421,7 +430,8 @@ function AdditionalDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (validateForm()) {
+    if (validateForm() && !isLoading) {
+      // Prevent submission if loading
       const sanitizedData = {
         ...formData,
         name: formData.name.trim(),
@@ -471,11 +481,24 @@ function AdditionalDialog({
         </div>
 
         <div className="flex gap-2 pt-4">
-          <Button type="button" variant="outline" onClick={onClose} className="flex-1 bg-transparent">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className="flex-1 bg-transparent"
+            disabled={isLoading}
+          >
             Cancelar
           </Button>
-          <Button type="submit" className="flex-1">
-            Salvar
+          <Button type="submit" className="flex-1" disabled={isLoading}>
+            {isLoading ? (
+              <div className="flex items-center gap-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Salvando...
+              </div>
+            ) : (
+              "Salvar"
+            )}
           </Button>
         </div>
       </form>

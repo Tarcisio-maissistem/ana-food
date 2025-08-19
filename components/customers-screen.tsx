@@ -68,6 +68,7 @@ export function CustomersScreen() {
   const [selectedCustomerHistory, setSelectedCustomerHistory] = useState<Customer | null>(null)
   const [orderHistory, setOrderHistory] = useState<OrderHistory[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const [isSaving, setIsSaving] = useState(false) // Added loading state for save operations to prevent double-click
 
   useEffect(() => {
     loadCustomers()
@@ -151,6 +152,9 @@ export function CustomersScreen() {
   }
 
   const handleSaveCustomer = async (customerData: Partial<Customer>) => {
+    if (isSaving) return // Prevent double-click
+    setIsSaving(true)
+
     try {
       if (selectedCustomer) {
         const response = await fetch("/api/customers", {
@@ -204,6 +208,8 @@ export function CustomersScreen() {
         title: "Erro",
         description: "Erro ao salvar cliente",
       })
+    } finally {
+      setIsSaving(false) // Re-enable button after operation
     }
   }
 
@@ -298,6 +304,7 @@ export function CustomersScreen() {
             customer={selectedCustomer}
             onSave={handleSaveCustomer}
             onClose={() => setIsDialogOpen(false)}
+            isLoading={isSaving} // Pass loading state to dialog
           />
         </Dialog>
       </div>
@@ -514,10 +521,12 @@ function CustomerDialog({
   customer,
   onSave,
   onClose,
+  isLoading,
 }: {
   customer: Customer | null
   onSave: (data: Partial<Customer>) => void
   onClose: () => void
+  isLoading?: boolean // Added loading prop
 }) {
   const [formData, setFormData] = useState({
     name: "",
@@ -587,7 +596,8 @@ function CustomerDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (validateForm()) {
+    if (validateForm() && !isLoading) {
+      // Prevent submission if loading
       const sanitizedData = {
         ...formData,
         name: formData.name.trim(),
@@ -669,11 +679,24 @@ function CustomerDialog({
         </div>
 
         <div className="flex gap-2 pt-4">
-          <Button type="button" variant="outline" onClick={onClose} className="flex-1 bg-transparent">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className="flex-1 bg-transparent"
+            disabled={isLoading}
+          >
             Cancelar
           </Button>
-          <Button type="submit" className="flex-1">
-            Salvar
+          <Button type="submit" className="flex-1" disabled={isLoading}>
+            {isLoading ? (
+              <div className="flex items-center gap-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Salvando...
+              </div>
+            ) : (
+              "Salvar"
+            )}
           </Button>
         </div>
       </form>

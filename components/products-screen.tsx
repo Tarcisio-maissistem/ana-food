@@ -123,7 +123,15 @@ export function ProductsScreen() {
   const [additionalsSearch, setAdditionalsSearch] = useState("")
   const [printLocationsSearch, setPrintLocationsSearch] = useState("")
 
+  const [isProductSaving, setIsProductSaving] = useState(false)
+  const [isCategorySaving, setIsCategorySaving] = useState(false)
+  const [isAdditionalSaving, setIsAdditionalSaving] = useState(false)
+  const [isPrintLocationSaving, setIsPrintLocationSaving] = useState(false)
+
   const handleSaveProduct = async (data: Partial<Product>) => {
+    if (isProductSaving) return // Prevent double-click
+    setIsProductSaving(true)
+
     try {
       const method = selectedProduct ? "PUT" : "POST"
       const url = selectedProduct ? `/api/products/${selectedProduct.id}` : "/api/products"
@@ -156,6 +164,8 @@ export function ProductsScreen() {
         title: "Erro",
         description: "Erro ao salvar produto. Tente novamente.",
       })
+    } finally {
+      setIsProductSaving(false) // Re-enable button after operation
     }
   }
 
@@ -327,6 +337,9 @@ export function ProductsScreen() {
   }
 
   const handleSaveCategory = async (data: Partial<Category>) => {
+    if (isCategorySaving) return // Prevent double-click
+    setIsCategorySaving(true)
+
     try {
       const method = selectedCategory ? "PUT" : "POST"
       const url = selectedCategory ? `/api/categories/${selectedCategory.id}` : "/api/categories"
@@ -360,10 +373,15 @@ export function ProductsScreen() {
         title: "Erro",
         description: "Erro ao salvar categoria. Tente novamente.",
       })
+    } finally {
+      setIsCategorySaving(false) // Re-enable button after operation
     }
   }
 
   const handleSaveAdditional = async (data: Partial<Additional>) => {
+    if (isAdditionalSaving) return // Prevent double-click
+    setIsAdditionalSaving(true)
+
     try {
       const method = selectedAdditional ? "PUT" : "POST"
       const url = selectedAdditional ? `/api/additionals/${selectedAdditional.id}` : "/api/additionals"
@@ -397,10 +415,15 @@ export function ProductsScreen() {
         title: "Erro",
         description: "Erro ao salvar adicional. Tente novamente.",
       })
+    } finally {
+      setIsAdditionalSaving(false) // Re-enable button after operation
     }
   }
 
   const handleSavePrintLocation = async (data: Partial<PrintLocation>) => {
+    if (isPrintLocationSaving) return // Prevent double-click
+    setIsPrintLocationSaving(true)
+
     try {
       const method = selectedPrintLocation ? "PUT" : "POST"
       const url = selectedPrintLocation ? `/api/print-locations/${selectedPrintLocation.id}` : "/api/print-locations"
@@ -434,6 +457,8 @@ export function ProductsScreen() {
         title: "Erro",
         description: "Erro ao salvar local de impressão. Tente novamente.",
       })
+    } finally {
+      setIsPrintLocationSaving(false) // Re-enable button after operation
     }
   }
 
@@ -532,6 +557,7 @@ export function ProductsScreen() {
             onClose={() => setIsDialogOpen(false)}
             printLocations={printLocationsList}
             categories={categoriesList}
+            isLoading={isProductSaving} // Pass loading state to dialog
           />
         </Dialog>
       </div>
@@ -714,6 +740,7 @@ export function ProductsScreen() {
             setCurrentPage={setCategoriesPage}
             searchTerm={categoriesSearch}
             setSearchTerm={setCategoriesSearch}
+            isCategorySaving={isCategorySaving}
           />
         </TabsContent>
 
@@ -731,6 +758,7 @@ export function ProductsScreen() {
             setCurrentPage={setAdditionalsPage}
             searchTerm={additionalsSearch}
             setSearchTerm={setAdditionalsSearch}
+            isAdditionalSaving={isAdditionalSaving}
           />
         </TabsContent>
 
@@ -748,6 +776,7 @@ export function ProductsScreen() {
             setCurrentPage={setPrintLocationsPage}
             searchTerm={printLocationsSearch}
             setSearchTerm={setPrintLocationsSearch}
+            isPrintLocationSaving={isPrintLocationSaving}
           />
         </TabsContent>
       </Tabs>
@@ -761,12 +790,14 @@ function ProductDialog({
   onClose,
   printLocations,
   categories: categoriesList,
+  isLoading,
 }: {
   product: Product | null
   onSave: (data: Partial<Product>) => void
   onClose: () => void
   printLocations: PrintLocation[]
   categories: Category[]
+  isLoading: boolean
 }) {
   const [formData, setFormData] = useState({
     name: "",
@@ -1000,12 +1031,12 @@ function ProductDialog({
             variant="outline"
             onClick={onClose}
             className="flex-1 bg-transparent"
-            disabled={isSubmitting}
+            disabled={isSubmitting || isLoading}
           >
             Cancelar
           </Button>
-          <Button type="submit" className="flex-1" disabled={isSubmitting}>
-            {isSubmitting ? (
+          <Button type="submit" className="flex-1" disabled={isSubmitting || isLoading}>
+            {isSubmitting || isLoading ? (
               <div className="flex items-center gap-2">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                 Salvando...
@@ -1034,6 +1065,7 @@ function CategoriesTab({
   setCurrentPage,
   searchTerm,
   setSearchTerm,
+  isCategorySaving,
 }: {
   categories: Category[]
   printLocations: PrintLocation[]
@@ -1048,6 +1080,7 @@ function CategoriesTab({
   setCurrentPage: (page: number) => void
   searchTerm: string
   setSearchTerm: (term: string) => void
+  isCategorySaving: boolean
 }) {
   return (
     <div className="space-y-4">
@@ -1065,6 +1098,7 @@ function CategoriesTab({
             printLocations={printLocations}
             onSave={onSave}
             onClose={() => setIsDialogOpen(false)}
+            isLoading={isCategorySaving}
           />
         </Dialog>
       </div>
@@ -1194,6 +1228,7 @@ function AdditionalsTab({
   setCurrentPage,
   searchTerm,
   setSearchTerm,
+  isAdditionalSaving,
 }: {
   additionals: Additional[]
   onReload: () => void
@@ -1207,6 +1242,7 @@ function AdditionalsTab({
   setCurrentPage: (page: number) => void
   searchTerm: string
   setSearchTerm: (term: string) => void
+  isAdditionalSaving: boolean
 }) {
   return (
     <div className="space-y-4">
@@ -1219,7 +1255,12 @@ function AdditionalsTab({
               Novo Adicional
             </Button>
           </DialogTrigger>
-          <AdditionalDialog additional={selectedAdditional} onSave={onSave} onClose={() => setIsDialogOpen(false)} />
+          <AdditionalDialog
+            additional={selectedAdditional}
+            onSave={onSave}
+            onClose={() => setIsDialogOpen(false)}
+            isLoading={isAdditionalSaving}
+          />
         </Dialog>
       </div>
 
@@ -1342,6 +1383,7 @@ function PrintLocationsTab({
   setCurrentPage,
   searchTerm,
   setSearchTerm,
+  isPrintLocationSaving,
 }: {
   printLocations: PrintLocation[]
   onReload: () => void
@@ -1355,6 +1397,7 @@ function PrintLocationsTab({
   setCurrentPage: (page: number) => void
   searchTerm: string
   setSearchTerm: (term: string) => void
+  isPrintLocationSaving: boolean
 }) {
   return (
     <div className="space-y-4">
@@ -1371,6 +1414,7 @@ function PrintLocationsTab({
             printLocation={selectedPrintLocation}
             onSave={onSave}
             onClose={() => setIsDialogOpen(false)}
+            isLoading={isPrintLocationSaving}
           />
         </Dialog>
       </div>
@@ -1484,11 +1528,13 @@ function CategoryDialog({
   printLocations,
   onSave,
   onClose,
+  isLoading,
 }: {
   category: Category | null
   printLocations: PrintLocation[]
   onSave: (data: Partial<Category>) => void
   onClose: () => void
+  isLoading: boolean
 }) {
   const [formData, setFormData] = useState({
     name: "",
@@ -1514,7 +1560,7 @@ function CategoryDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.name.trim()) return
+    if (!formData.name.trim() || isLoading) return // Prevent submission if saving
     onSave(formData)
   }
 
@@ -1562,8 +1608,15 @@ function CategoryDialog({
           <Button type="button" variant="outline" onClick={onClose} className="flex-1 bg-transparent">
             Cancelar
           </Button>
-          <Button type="submit" className="flex-1">
-            Salvar
+          <Button type="submit" className="flex-1" disabled={isLoading}>
+            {isLoading ? (
+              <div className="flex items-center gap-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Salvando...
+              </div>
+            ) : (
+              "Salvar"
+            )}
           </Button>
         </div>
       </form>
@@ -1575,10 +1628,12 @@ function AdditionalDialog({
   additional,
   onSave,
   onClose,
+  isLoading,
 }: {
   additional: Additional | null
   onSave: (data: Partial<Additional>) => void
   onClose: () => void
+  isLoading: boolean
 }) {
   const [formData, setFormData] = useState({
     name: "",
@@ -1619,7 +1674,7 @@ function AdditionalDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.name.trim()) return
+    if (!formData.name.trim() || isLoading) return // Prevent submission if saving
     onSave(formData)
   }
 
@@ -1659,8 +1714,15 @@ function AdditionalDialog({
           <Button type="button" variant="outline" onClick={onClose} className="flex-1 bg-transparent">
             Cancelar
           </Button>
-          <Button type="submit" className="flex-1">
-            Salvar
+          <Button type="submit" className="flex-1" disabled={isLoading}>
+            {isLoading ? (
+              <div className="flex items-center gap-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Salvando...
+              </div>
+            ) : (
+              "Salvar"
+            )}
           </Button>
         </div>
       </form>
@@ -1672,10 +1734,12 @@ function PrintLocationDialog({
   printLocation,
   onSave,
   onClose,
+  isLoading,
 }: {
   printLocation: PrintLocation | null
   onSave: (data: Partial<PrintLocation>) => void
   onClose: () => void
+  isLoading: boolean
 }) {
   const [formData, setFormData] = useState({
     name: "",
@@ -1698,7 +1762,7 @@ function PrintLocationDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.name.trim()) return
+    if (!formData.name.trim() || isLoading) return // Prevent submission if saving
     onSave(formData)
   }
 
@@ -1728,8 +1792,15 @@ function PrintLocationDialog({
           <Button type="button" variant="outline" onClick={onClose} className="flex-1 bg-transparent">
             Cancelar
           </Button>
-          <Button type="submit" className="flex-1">
-            Salvar
+          <Button type="submit" className="flex-1" disabled={isLoading}>
+            {isLoading ? (
+              <div className="flex items-center gap-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Salvando...
+              </div>
+            ) : (
+              "Salvar"
+            )}
           </Button>
         </div>
       </form>
