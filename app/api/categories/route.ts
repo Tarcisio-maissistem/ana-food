@@ -180,15 +180,34 @@ export async function POST(request: NextRequest) {
       userId = user?.id
     }
 
+    let companyId = null
+    if (userId) {
+      const { data: company } = await supabase.from("companies").select("id").eq("user_id", userId).maybeSingle()
+      companyId = company?.id
+    }
+
+    let defaultPrintLocationId = null
+    if (userId) {
+      const { data: printLocation } = await supabase
+        .from("print_locations")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("name", "Não imprimir")
+        .maybeSingle()
+      defaultPrintLocationId = printLocation?.id
+    }
+
     const tableExists = await checkTableExists(supabase)
 
     if (!tableExists) {
       const newCategory = {
         id: `${userId || Date.now()}-${Date.now()}`,
-        nome: body.name || body.nome,
-        descricao: body.description || body.descricao || "",
-        ativo: body.on_off ?? body.ativo ?? true,
+        name: body.name || body.nome, // Usar 'name' como padrão
+        description: body.description || body.descricao || "",
+        on_off: body.on_off ?? body.ativo ?? true,
         user_id: userId,
+        company_id: companyId,
+        print_location_id: defaultPrintLocationId,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
@@ -200,41 +219,51 @@ export async function POST(request: NextRequest) {
 
     const insertData: any = {}
 
-    if (availableColumns.includes("nome")) {
-      insertData.nome = body.name || body.nome
-    } else if (availableColumns.includes("name")) {
+    if (availableColumns.includes("name")) {
       insertData.name = body.name || body.nome
+    } else if (availableColumns.includes("nome")) {
+      insertData.nome = body.name || body.nome
     }
 
-    if (availableColumns.includes("descricao")) {
-      insertData.descricao = body.description || body.descricao || ""
-    } else if (availableColumns.includes("description")) {
+    if (availableColumns.includes("description")) {
       insertData.description = body.description || body.descricao || ""
+    } else if (availableColumns.includes("descricao")) {
+      insertData.descricao = body.description || body.descricao || ""
     }
 
-    if (availableColumns.includes("ativo")) {
-      insertData.ativo = body.on_off ?? body.ativo ?? true
-    } else if (availableColumns.includes("on_off")) {
+    if (availableColumns.includes("on_off")) {
       insertData.on_off = body.on_off ?? body.ativo ?? true
+    } else if (availableColumns.includes("ativo")) {
+      insertData.ativo = body.on_off ?? body.ativo ?? true
     }
 
     if (availableColumns.includes("user_id") && userId) {
       insertData.user_id = userId
     }
 
+    if (availableColumns.includes("company_id") && companyId) {
+      insertData.company_id = companyId
+    }
+
+    if (availableColumns.includes("print_location_id")) {
+      insertData.print_location_id = body.print_location_id || defaultPrintLocationId
+    }
+
     console.log("[v0] Dados para inserção:", insertData)
 
     try {
-      const { data, error } = await supabase.from("categories").insert(insertData).select().single()
+      const { data, error } = await supabase.from("categories").insert(insertData).select().maybeSingle()
 
       if (error) {
         console.error("Erro ao criar categoria:", error)
         return NextResponse.json({
           id: `${userId || Date.now()}-${Date.now()}`,
-          nome: body.name || body.nome,
-          descricao: body.description || body.descricao || "",
-          ativo: body.on_off ?? body.ativo ?? true,
+          name: body.name || body.nome,
+          description: body.description || body.descricao || "",
+          on_off: body.on_off ?? body.ativo ?? true,
           user_id: userId,
+          company_id: companyId,
+          print_location_id: defaultPrintLocationId,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
@@ -245,10 +274,12 @@ export async function POST(request: NextRequest) {
       console.error("Erro durante inserção:", insertError)
       return NextResponse.json({
         id: `${userId || Date.now()}-${Date.now()}`,
-        nome: body.name || body.nome,
-        descricao: body.description || body.descricao || "",
-        ativo: body.on_off ?? body.ativo ?? true,
+        name: body.name || body.nome,
+        description: body.description || body.descricao || "",
+        on_off: body.on_off ?? body.ativo ?? true,
         user_id: userId,
+        company_id: companyId,
+        print_location_id: defaultPrintLocationId,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
@@ -278,9 +309,9 @@ export async function PUT(request: NextRequest) {
     if (!tableExists) {
       const updatedCategory = {
         id,
-        nome: updateData.name || updateData.nome,
-        descricao: updateData.description || updateData.descricao || "",
-        ativo: updateData.on_off ?? updateData.ativo ?? true,
+        name: updateData.name || updateData.nome,
+        description: updateData.description || updateData.descricao || "",
+        on_off: updateData.on_off ?? updateData.ativo ?? true,
         user_id: userId,
         updated_at: new Date().toISOString(),
       }
@@ -292,34 +323,38 @@ export async function PUT(request: NextRequest) {
 
     const updatePayload: any = {}
 
-    if (availableColumns.includes("nome")) {
-      if (updateData.name || updateData.nome) {
-        updatePayload.nome = updateData.name || updateData.nome
-      }
-    } else if (availableColumns.includes("name")) {
+    if (availableColumns.includes("name")) {
       if (updateData.name || updateData.nome) {
         updatePayload.name = updateData.name || updateData.nome
       }
+    } else if (availableColumns.includes("nome")) {
+      if (updateData.name || updateData.nome) {
+        updatePayload.nome = updateData.name || updateData.nome
+      }
     }
 
-    if (availableColumns.includes("descricao")) {
-      if (updateData.description !== undefined || updateData.descricao !== undefined) {
-        updatePayload.descricao = updateData.description || updateData.descricao || ""
-      }
-    } else if (availableColumns.includes("description")) {
+    if (availableColumns.includes("description")) {
       if (updateData.description !== undefined || updateData.descricao !== undefined) {
         updatePayload.description = updateData.description || updateData.descricao || ""
       }
+    } else if (availableColumns.includes("descricao")) {
+      if (updateData.description !== undefined || updateData.descricao !== undefined) {
+        updatePayload.descricao = updateData.description || updateData.descricao || ""
+      }
     }
 
-    if (availableColumns.includes("ativo")) {
-      if (updateData.on_off !== undefined || updateData.ativo !== undefined) {
-        updatePayload.ativo = updateData.on_off ?? updateData.ativo
-      }
-    } else if (availableColumns.includes("on_off")) {
+    if (availableColumns.includes("on_off")) {
       if (updateData.on_off !== undefined || updateData.ativo !== undefined) {
         updatePayload.on_off = updateData.on_off ?? updateData.ativo
       }
+    } else if (availableColumns.includes("ativo")) {
+      if (updateData.on_off !== undefined || updateData.ativo !== undefined) {
+        updatePayload.ativo = updateData.on_off ?? updateData.ativo
+      }
+    }
+
+    if (availableColumns.includes("print_location_id") && updateData.print_location_id !== undefined) {
+      updatePayload.print_location_id = updateData.print_location_id
     }
 
     if (availableColumns.includes("updated_at")) {
@@ -329,15 +364,21 @@ export async function PUT(request: NextRequest) {
     console.log("[v0] Dados para atualização:", updatePayload)
 
     try {
-      const { data, error } = await supabase.from("categories").update(updatePayload).eq("id", id).select().single()
+      const { data, error } = await supabase
+        .from("categories")
+        .update(updatePayload)
+        .eq("id", id)
+        .select()
+        .limit(1)
+        .maybeSingle()
 
       if (error) {
         console.error("Erro ao atualizar categoria:", error)
         return NextResponse.json({
           id,
-          nome: updateData.name || updateData.nome,
-          descricao: updateData.description || updateData.descricao || "",
-          ativo: updateData.on_off ?? updateData.ativo ?? true,
+          name: updateData.name || updateData.nome,
+          description: updateData.description || updateData.descricao || "",
+          on_off: updateData.on_off ?? updateData.ativo ?? true,
           user_id: userId,
           updated_at: new Date().toISOString(),
         })
@@ -348,9 +389,9 @@ export async function PUT(request: NextRequest) {
       console.error("Erro durante atualização:", updateError)
       return NextResponse.json({
         id,
-        nome: updateData.name || updateData.nome,
-        descricao: updateData.description || updateData.descricao || "",
-        ativo: updateData.on_off ?? updateData.ativo ?? true,
+        name: updateData.name || updateData.nome,
+        description: updateData.description || updateData.descricao || "",
+        on_off: updateData.on_off ?? updateData.ativo ?? true,
         user_id: userId,
         updated_at: new Date().toISOString(),
       })

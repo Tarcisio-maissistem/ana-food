@@ -1096,7 +1096,9 @@ function CategoriesTab({
             <tbody>
               {categories.map((category) => (
                 <tr key={category.id} className="border-b hover:bg-gray-50">
-                  <td className="p-4 font-medium">{category.name || `Categoria ${category.id.slice(0, 8)}`}</td>
+                  <td className="p-4 font-medium">
+                    {category.name || (category as any).nome || `Categoria ${category.id.slice(0, 8)}`}
+                  </td>
                   <td className="p-4">
                     <Badge variant="secondary">
                       {printLocations.find((pl) => pl.id === category.print_location_id)?.name || "Não definido"}
