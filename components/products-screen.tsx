@@ -96,6 +96,33 @@ export function ProductsScreen() {
   const [selectedAdditional, setSelectedAdditional] = useState<Additional | null>(null)
   const [selectedPrintLocation, setSelectedPrintLocation] = useState<PrintLocation | null>(null)
 
+  const [categoriesPagination, setCategoriesPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0,
+  })
+  const [additionalsPagination, setAdditionalsPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0,
+  })
+  const [printLocationsPagination, setPrintLocationsPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0,
+  })
+
+  const [categoriesPage, setCategoriesPage] = useState(1)
+  const [additionalsPage, setAdditionalsPage] = useState(1)
+  const [printLocationsPage, setPrintLocationsPage] = useState(1)
+
+  const [categoriesSearch, setCategoriesSearch] = useState("")
+  const [additionalsSearch, setAdditionalsSearch] = useState("")
+  const [printLocationsSearch, setPrintLocationsSearch] = useState("")
+
   const handleSaveProduct = async (data: Partial<Product>) => {
     try {
       const method = selectedProduct ? "PUT" : "POST"
@@ -202,12 +229,31 @@ export function ProductsScreen() {
 
   const loadCategories = async () => {
     try {
-      const response = await fetch("/api/categories", {
-        headers: { "X-User-Email": "tarcisiorp16@gmail.com" },
+      const params = new URLSearchParams({
+        page: categoriesPage.toString(),
+        limit: "10",
+        search: categoriesSearch,
+      })
+
+      const response = await fetch(`/api/categories?${params}`, {
+        headers: {
+          "X-User-Email": "tarcisiorp16@gmail.com",
+        },
       })
       if (response.ok) {
-        const data = await response.json()
-        setCategoriesList(Array.isArray(data) ? data : [])
+        const result = await response.json()
+        if (result.data && result.pagination) {
+          setCategoriesList(result.data)
+          setCategoriesPagination(result.pagination)
+        } else {
+          setCategoriesList(Array.isArray(result) ? result : [])
+          setCategoriesPagination({
+            page: 1,
+            limit: 10,
+            total: Array.isArray(result) ? result.length : 0,
+            totalPages: 1,
+          })
+        }
       }
     } catch (error) {
       console.error("Erro ao carregar categorias:", error)
@@ -216,12 +262,31 @@ export function ProductsScreen() {
 
   const loadAdditionals = async () => {
     try {
-      const response = await fetch("/api/additionals", {
-        headers: { "X-User-Email": "tarcisiorp16@gmail.com" },
+      const params = new URLSearchParams({
+        page: additionalsPage.toString(),
+        limit: "10",
+        search: additionalsSearch,
+      })
+
+      const response = await fetch(`/api/additionals?${params}`, {
+        headers: {
+          "X-User-Email": "tarcisiorp16@gmail.com",
+        },
       })
       if (response.ok) {
-        const data = await response.json()
-        setAdditionalsList(Array.isArray(data) ? data : [])
+        const result = await response.json()
+        if (result.data && result.pagination) {
+          setAdditionalsList(result.data)
+          setAdditionalsPagination(result.pagination)
+        } else {
+          setAdditionalsList(Array.isArray(result) ? result : [])
+          setAdditionalsPagination({
+            page: 1,
+            limit: 10,
+            total: Array.isArray(result) ? result.length : 0,
+            totalPages: 1,
+          })
+        }
       }
     } catch (error) {
       console.error("Erro ao carregar adicionais:", error)
@@ -230,12 +295,31 @@ export function ProductsScreen() {
 
   const loadPrintLocations = async () => {
     try {
-      const response = await fetch("/api/print-locations", {
-        headers: { "X-User-Email": "tarcisiorp16@gmail.com" },
+      const params = new URLSearchParams({
+        page: printLocationsPage.toString(),
+        limit: "10",
+        search: printLocationsSearch,
+      })
+
+      const response = await fetch(`/api/print-locations?${params}`, {
+        headers: {
+          "X-User-Email": "tarcisiorp16@gmail.com",
+        },
       })
       if (response.ok) {
-        const data = await response.json()
-        setPrintLocationsList(Array.isArray(data) ? data : [])
+        const result = await response.json()
+        if (result.data && result.pagination) {
+          setPrintLocationsList(result.data)
+          setPrintLocationsPagination(result.pagination)
+        } else {
+          setPrintLocationsList(Array.isArray(result) ? result : [])
+          setPrintLocationsPagination({
+            page: 1,
+            limit: 10,
+            total: Array.isArray(result) ? result.length : 0,
+            totalPages: 1,
+          })
+        }
       }
     } catch (error) {
       console.error("Erro ao carregar locais de impressão:", error)
@@ -410,6 +494,18 @@ export function ProductsScreen() {
     loadAdditionals()
     loadPrintLocations()
   }, [currentPage, searchTerm, categoryFilter])
+
+  useEffect(() => {
+    loadCategories()
+  }, [categoriesPage, categoriesSearch])
+
+  useEffect(() => {
+    loadAdditionals()
+  }, [additionalsPage, additionalsSearch])
+
+  useEffect(() => {
+    loadPrintLocations()
+  }, [printLocationsPage, printLocationsSearch])
 
   if (loading) {
     return (
@@ -613,6 +709,11 @@ export function ProductsScreen() {
             selectedCategory={selectedCategory}
             setSelectedCategory={setSelectedCategory}
             onSave={handleSaveCategory}
+            pagination={categoriesPagination}
+            currentPage={categoriesPage}
+            setCurrentPage={setCategoriesPage}
+            searchTerm={categoriesSearch}
+            setSearchTerm={setCategoriesSearch}
           />
         </TabsContent>
 
@@ -625,6 +726,11 @@ export function ProductsScreen() {
             selectedAdditional={selectedAdditional}
             setSelectedAdditional={setSelectedAdditional}
             onSave={handleSaveAdditional}
+            pagination={additionalsPagination}
+            currentPage={additionalsPage}
+            setCurrentPage={setAdditionalsPage}
+            searchTerm={additionalsSearch}
+            setSearchTerm={setAdditionalsSearch}
           />
         </TabsContent>
 
@@ -637,6 +743,11 @@ export function ProductsScreen() {
             selectedPrintLocation={selectedPrintLocation}
             setSelectedPrintLocation={setSelectedPrintLocation}
             onSave={handleSavePrintLocation}
+            pagination={printLocationsPagination}
+            currentPage={printLocationsPage}
+            setCurrentPage={setPrintLocationsPage}
+            searchTerm={printLocationsSearch}
+            setSearchTerm={setPrintLocationsSearch}
           />
         </TabsContent>
       </Tabs>
@@ -918,6 +1029,11 @@ function CategoriesTab({
   selectedCategory,
   setSelectedCategory,
   onSave,
+  pagination,
+  currentPage,
+  setCurrentPage,
+  searchTerm,
+  setSearchTerm,
 }: {
   categories: Category[]
   printLocations: PrintLocation[]
@@ -927,6 +1043,11 @@ function CategoriesTab({
   selectedCategory: Category | null
   setSelectedCategory: (category: Category | null) => void
   onSave: (data: Partial<Category>) => void
+  pagination: { page: number; limit: number; total: number; totalPages: number }
+  currentPage: number
+  setCurrentPage: (page: number) => void
+  searchTerm: string
+  setSearchTerm: (term: string) => void
 }) {
   return (
     <div className="space-y-4">
@@ -946,6 +1067,19 @@ function CategoriesTab({
             onClose={() => setIsDialogOpen(false)}
           />
         </Dialog>
+      </div>
+
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Input
+          placeholder="Buscar categorias..."
+          value={searchTerm}
+          onChange={(e) => {
+            setSearchTerm(e.target.value)
+            setCurrentPage(1)
+          }}
+          className="pl-10"
+        />
       </div>
 
       <div className="bg-white rounded-lg border">
@@ -1005,6 +1139,42 @@ function CategoriesTab({
           </div>
         )}
       </div>
+
+      {pagination.totalPages > 1 && (
+        <div className="flex justify-center">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+
+              {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((page) => (
+                <PaginationItem key={page}>
+                  <PaginationLink
+                    onClick={() => setCurrentPage(page)}
+                    isActive={currentPage === page}
+                    className="cursor-pointer"
+                  >
+                    {page}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => setCurrentPage(Math.min(pagination.totalPages, currentPage + 1))}
+                  className={
+                    currentPage === pagination.totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"
+                  }
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
     </div>
   )
 }
@@ -1017,6 +1187,11 @@ function AdditionalsTab({
   selectedAdditional,
   setSelectedAdditional,
   onSave,
+  pagination,
+  currentPage,
+  setCurrentPage,
+  searchTerm,
+  setSearchTerm,
 }: {
   additionals: Additional[]
   onReload: () => void
@@ -1025,6 +1200,11 @@ function AdditionalsTab({
   selectedAdditional: Additional | null
   setSelectedAdditional: (additional: Additional | null) => void
   onSave: (data: Partial<Additional>) => void
+  pagination: { page: number; limit: number; total: number; totalPages: number }
+  currentPage: number
+  setCurrentPage: (page: number) => void
+  searchTerm: string
+  setSearchTerm: (term: string) => void
 }) {
   return (
     <div className="space-y-4">
@@ -1039,6 +1219,19 @@ function AdditionalsTab({
           </DialogTrigger>
           <AdditionalDialog additional={selectedAdditional} onSave={onSave} onClose={() => setIsDialogOpen(false)} />
         </Dialog>
+      </div>
+
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Input
+          placeholder="Buscar adicionais..."
+          value={searchTerm}
+          onChange={(e) => {
+            setSearchTerm(e.target.value)
+            setCurrentPage(1)
+          }}
+          className="pl-10"
+        />
       </div>
 
       <div className="bg-white rounded-lg border">
@@ -1094,6 +1287,42 @@ function AdditionalsTab({
           </div>
         )}
       </div>
+
+      {pagination.totalPages > 1 && (
+        <div className="flex justify-center">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+
+              {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((page) => (
+                <PaginationItem key={page}>
+                  <PaginationLink
+                    onClick={() => setCurrentPage(page)}
+                    isActive={currentPage === page}
+                    className="cursor-pointer"
+                  >
+                    {page}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => setCurrentPage(Math.min(pagination.totalPages, currentPage + 1))}
+                  className={
+                    currentPage === pagination.totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"
+                  }
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
     </div>
   )
 }
@@ -1106,6 +1335,11 @@ function PrintLocationsTab({
   selectedPrintLocation,
   setSelectedPrintLocation,
   onSave,
+  pagination,
+  currentPage,
+  setCurrentPage,
+  searchTerm,
+  setSearchTerm,
 }: {
   printLocations: PrintLocation[]
   onReload: () => void
@@ -1114,6 +1348,11 @@ function PrintLocationsTab({
   selectedPrintLocation: PrintLocation | null
   setSelectedPrintLocation: (location: PrintLocation | null) => void
   onSave: (data: Partial<PrintLocation>) => void
+  pagination: { page: number; limit: number; total: number; totalPages: number }
+  currentPage: number
+  setCurrentPage: (page: number) => void
+  searchTerm: string
+  setSearchTerm: (term: string) => void
 }) {
   return (
     <div className="space-y-4">
@@ -1132,6 +1371,19 @@ function PrintLocationsTab({
             onClose={() => setIsDialogOpen(false)}
           />
         </Dialog>
+      </div>
+
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Input
+          placeholder="Buscar locais de impressão..."
+          value={searchTerm}
+          onChange={(e) => {
+            setSearchTerm(e.target.value)
+            setCurrentPage(1)
+          }}
+          className="pl-10"
+        />
       </div>
 
       <div className="bg-white rounded-lg border">
@@ -1185,6 +1437,42 @@ function PrintLocationsTab({
           </div>
         )}
       </div>
+
+      {pagination.totalPages > 1 && (
+        <div className="flex justify-center">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+
+              {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((page) => (
+                <PaginationItem key={page}>
+                  <PaginationLink
+                    onClick={() => setCurrentPage(page)}
+                    isActive={currentPage === page}
+                    className="cursor-pointer"
+                  >
+                    {page}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => setCurrentPage(Math.min(pagination.totalPages, currentPage + 1))}
+                  className={
+                    currentPage === pagination.totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"
+                  }
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
     </div>
   )
 }
