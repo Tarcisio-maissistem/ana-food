@@ -89,6 +89,13 @@ export function ProductsScreen() {
   const [printLocationsList, setPrintLocationsList] = useState<PrintLocation[]>([])
   const [activeTab, setActiveTab] = useState("products")
 
+  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false)
+  const [isAdditionalDialogOpen, setIsAdditionalDialogOpen] = useState(false)
+  const [isPrintLocationDialogOpen, setIsPrintLocationDialogOpen] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
+  const [selectedAdditional, setSelectedAdditional] = useState<Additional | null>(null)
+  const [selectedPrintLocation, setSelectedPrintLocation] = useState<PrintLocation | null>(null)
+
   const handleSaveProduct = async (data: Partial<Product>) => {
     try {
       const method = selectedProduct ? "PUT" : "POST"
@@ -232,6 +239,117 @@ export function ProductsScreen() {
       }
     } catch (error) {
       console.error("Erro ao carregar locais de impressão:", error)
+    }
+  }
+
+  const handleSaveCategory = async (data: Partial<Category>) => {
+    try {
+      const method = selectedCategory ? "PUT" : "POST"
+      const url = selectedCategory ? `/api/categories/${selectedCategory.id}` : "/api/categories"
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Email": "tarcisiorp16@gmail.com",
+        },
+        body: JSON.stringify(data),
+      })
+
+      if (response.ok) {
+        // @ts-ignore
+        window.showToast?.({
+          type: "success",
+          title: "Sucesso",
+          description: selectedCategory ? "Categoria atualizada com sucesso" : "Categoria criada com sucesso",
+        })
+        setIsCategoryDialogOpen(false)
+        loadCategories()
+      } else {
+        throw new Error("Erro na resposta da API")
+      }
+    } catch (error) {
+      console.error("Erro ao salvar categoria:", error)
+      // @ts-ignore
+      window.showToast?.({
+        type: "error",
+        title: "Erro",
+        description: "Erro ao salvar categoria. Tente novamente.",
+      })
+    }
+  }
+
+  const handleSaveAdditional = async (data: Partial<Additional>) => {
+    try {
+      const method = selectedAdditional ? "PUT" : "POST"
+      const url = selectedAdditional ? `/api/additionals/${selectedAdditional.id}` : "/api/additionals"
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Email": "tarcisiorp16@gmail.com",
+        },
+        body: JSON.stringify(data),
+      })
+
+      if (response.ok) {
+        // @ts-ignore
+        window.showToast?.({
+          type: "success",
+          title: "Sucesso",
+          description: selectedAdditional ? "Adicional atualizado com sucesso" : "Adicional criado com sucesso",
+        })
+        setIsAdditionalDialogOpen(false)
+        loadAdditionals()
+      } else {
+        throw new Error("Erro na resposta da API")
+      }
+    } catch (error) {
+      console.error("Erro ao salvar adicional:", error)
+      // @ts-ignore
+      window.showToast?.({
+        type: "error",
+        title: "Erro",
+        description: "Erro ao salvar adicional. Tente novamente.",
+      })
+    }
+  }
+
+  const handleSavePrintLocation = async (data: Partial<PrintLocation>) => {
+    try {
+      const method = selectedPrintLocation ? "PUT" : "POST"
+      const url = selectedPrintLocation ? `/api/print-locations/${selectedPrintLocation.id}` : "/api/print-locations"
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Email": "tarcisiorp16@gmail.com",
+        },
+        body: JSON.stringify(data),
+      })
+
+      if (response.ok) {
+        // @ts-ignore
+        window.showToast?.({
+          type: "success",
+          title: "Sucesso",
+          description: selectedPrintLocation ? "Local atualizado com sucesso" : "Local criado com sucesso",
+        })
+        setIsPrintLocationDialogOpen(false)
+        loadPrintLocations()
+      } else {
+        throw new Error("Erro na resposta da API")
+      }
+    } catch (error) {
+      console.error("Erro ao salvar local de impressão:", error)
+      // @ts-ignore
+      window.showToast?.({
+        type: "error",
+        title: "Erro",
+        description: "Erro ao salvar local de impressão. Tente novamente.",
+      })
     }
   }
 
@@ -486,15 +604,40 @@ export function ProductsScreen() {
         </TabsContent>
 
         <TabsContent value="categories" className="space-y-4">
-          <CategoriesTab categories={categoriesList} printLocations={printLocationsList} onReload={loadCategories} />
+          <CategoriesTab
+            categories={categoriesList}
+            printLocations={printLocationsList}
+            onReload={loadCategories}
+            isDialogOpen={isCategoryDialogOpen}
+            setIsDialogOpen={setIsCategoryDialogOpen}
+            selectedCategory={selectedCategory}
+            setSelectedCategory={setSelectedCategory}
+            onSave={handleSaveCategory}
+          />
         </TabsContent>
 
         <TabsContent value="additionals" className="space-y-4">
-          <AdditionalsTab additionals={additionalsList} onReload={loadAdditionals} />
+          <AdditionalsTab
+            additionals={additionalsList}
+            onReload={loadAdditionals}
+            isDialogOpen={isAdditionalDialogOpen}
+            setIsDialogOpen={setIsAdditionalDialogOpen}
+            selectedAdditional={selectedAdditional}
+            setSelectedAdditional={setSelectedAdditional}
+            onSave={handleSaveAdditional}
+          />
         </TabsContent>
 
         <TabsContent value="print-locations" className="space-y-4">
-          <PrintLocationsTab printLocations={printLocationsList} onReload={loadPrintLocations} />
+          <PrintLocationsTab
+            printLocations={printLocationsList}
+            onReload={loadPrintLocations}
+            isDialogOpen={isPrintLocationDialogOpen}
+            setIsDialogOpen={setIsPrintLocationDialogOpen}
+            selectedPrintLocation={selectedPrintLocation}
+            setSelectedPrintLocation={setSelectedPrintLocation}
+            onSave={handleSavePrintLocation}
+          />
         </TabsContent>
       </Tabs>
     </div>
@@ -770,19 +913,39 @@ function CategoriesTab({
   categories,
   printLocations,
   onReload,
+  isDialogOpen,
+  setIsDialogOpen,
+  selectedCategory,
+  setSelectedCategory,
+  onSave,
 }: {
   categories: Category[]
   printLocations: PrintLocation[]
   onReload: () => void
+  isDialogOpen: boolean
+  setIsDialogOpen: (open: boolean) => void
+  selectedCategory: Category | null
+  setSelectedCategory: (category: Category | null) => void
+  onSave: (data: Partial<Category>) => void
 }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">Categorias</h2>
-        <Button size="sm">
-          <Plus className="w-4 h-4 mr-2" />
-          Nova Categoria
-        </Button>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" onClick={() => setSelectedCategory(null)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Nova Categoria
+            </Button>
+          </DialogTrigger>
+          <CategoryDialog
+            category={selectedCategory}
+            printLocations={printLocations}
+            onSave={onSave}
+            onClose={() => setIsDialogOpen(false)}
+          />
+        </Dialog>
       </div>
 
       <div className="bg-white rounded-lg border">
@@ -815,7 +978,14 @@ function CategoriesTab({
                   </td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedCategory(category)
+                          setIsDialogOpen(true)
+                        }}
+                      >
                         <Edit className="w-4 h-4" />
                       </Button>
                       <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 bg-transparent">
@@ -839,15 +1009,36 @@ function CategoriesTab({
   )
 }
 
-function AdditionalsTab({ additionals, onReload }: { additionals: Additional[]; onReload: () => void }) {
+function AdditionalsTab({
+  additionals,
+  onReload,
+  isDialogOpen,
+  setIsDialogOpen,
+  selectedAdditional,
+  setSelectedAdditional,
+  onSave,
+}: {
+  additionals: Additional[]
+  onReload: () => void
+  isDialogOpen: boolean
+  setIsDialogOpen: (open: boolean) => void
+  selectedAdditional: Additional | null
+  setSelectedAdditional: (additional: Additional | null) => void
+  onSave: (data: Partial<Additional>) => void
+}) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">Adicionais</h2>
-        <Button size="sm">
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Adicional
-        </Button>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" onClick={() => setSelectedAdditional(null)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Novo Adicional
+            </Button>
+          </DialogTrigger>
+          <AdditionalDialog additional={selectedAdditional} onSave={onSave} onClose={() => setIsDialogOpen(false)} />
+        </Dialog>
       </div>
 
       <div className="bg-white rounded-lg border">
@@ -876,7 +1067,14 @@ function AdditionalsTab({ additionals, onReload }: { additionals: Additional[]; 
                   </td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedAdditional(additional)
+                          setIsDialogOpen(true)
+                        }}
+                      >
                         <Edit className="w-4 h-4" />
                       </Button>
                       <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 bg-transparent">
@@ -900,15 +1098,40 @@ function AdditionalsTab({ additionals, onReload }: { additionals: Additional[]; 
   )
 }
 
-function PrintLocationsTab({ printLocations, onReload }: { printLocations: PrintLocation[]; onReload: () => void }) {
+function PrintLocationsTab({
+  printLocations,
+  onReload,
+  isDialogOpen,
+  setIsDialogOpen,
+  selectedPrintLocation,
+  setSelectedPrintLocation,
+  onSave,
+}: {
+  printLocations: PrintLocation[]
+  onReload: () => void
+  isDialogOpen: boolean
+  setIsDialogOpen: (open: boolean) => void
+  selectedPrintLocation: PrintLocation | null
+  setSelectedPrintLocation: (location: PrintLocation | null) => void
+  onSave: (data: Partial<PrintLocation>) => void
+}) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">Locais de Impressão</h2>
-        <Button size="sm">
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Local
-        </Button>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" onClick={() => setSelectedPrintLocation(null)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Novo Local
+            </Button>
+          </DialogTrigger>
+          <PrintLocationDialog
+            printLocation={selectedPrintLocation}
+            onSave={onSave}
+            onClose={() => setIsDialogOpen(false)}
+          />
+        </Dialog>
       </div>
 
       <div className="bg-white rounded-lg border">
@@ -935,7 +1158,14 @@ function PrintLocationsTab({ printLocations, onReload }: { printLocations: Print
                   </td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedPrintLocation(location)
+                          setIsDialogOpen(true)
+                        }}
+                      >
                         <Edit className="w-4 h-4" />
                       </Button>
                       <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 bg-transparent">
@@ -956,5 +1186,263 @@ function PrintLocationsTab({ printLocations, onReload }: { printLocations: Print
         )}
       </div>
     </div>
+  )
+}
+
+function CategoryDialog({
+  category,
+  printLocations,
+  onSave,
+  onClose,
+}: {
+  category: Category | null
+  printLocations: PrintLocation[]
+  onSave: (data: Partial<Category>) => void
+  onClose: () => void
+}) {
+  const [formData, setFormData] = useState({
+    name: "",
+    on_off: true,
+    print_location_id: "",
+  })
+
+  useEffect(() => {
+    if (category) {
+      setFormData({
+        name: category.name || "",
+        on_off: category.on_off ?? true,
+        print_location_id: category.print_location_id || "",
+      })
+    } else {
+      setFormData({
+        name: "",
+        on_off: true,
+        print_location_id: "",
+      })
+    }
+  }, [category])
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.name.trim()) return
+    onSave(formData)
+  }
+
+  return (
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>{category ? "Editar Categoria" : "Nova Categoria"}</DialogTitle>
+      </DialogHeader>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="text-sm font-medium">Nome *</label>
+          <Input
+            value={formData.name}
+            onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+            placeholder="Nome da categoria"
+            required
+          />
+        </div>
+        <div>
+          <label className="text-sm font-medium">Local de Impressão</label>
+          <Select
+            value={formData.print_location_id}
+            onValueChange={(value) => setFormData((prev) => ({ ...prev, print_location_id: value }))}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione um local" />
+            </SelectTrigger>
+            <SelectContent>
+              {printLocations.map((location) => (
+                <SelectItem key={location.id} value={location.id}>
+                  {location.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={formData.on_off}
+            onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, on_off: checked }))}
+          />
+          <label className="text-sm font-medium">Categoria ativa</label>
+        </div>
+        <div className="flex gap-2 pt-4">
+          <Button type="button" variant="outline" onClick={onClose} className="flex-1 bg-transparent">
+            Cancelar
+          </Button>
+          <Button type="submit" className="flex-1">
+            Salvar
+          </Button>
+        </div>
+      </form>
+    </DialogContent>
+  )
+}
+
+function AdditionalDialog({
+  additional,
+  onSave,
+  onClose,
+}: {
+  additional: Additional | null
+  onSave: (data: Partial<Additional>) => void
+  onClose: () => void
+}) {
+  const [formData, setFormData] = useState({
+    name: "",
+    price: 0,
+    on_off: true,
+  })
+  const [priceDisplay, setPriceDisplay] = useState("")
+
+  useEffect(() => {
+    if (additional) {
+      setFormData({
+        name: additional.name || "",
+        price: additional.price || 0,
+        on_off: additional.on_off ?? true,
+      })
+      setPriceDisplay(formatCurrency(additional.price || 0))
+    } else {
+      setFormData({
+        name: "",
+        price: 0,
+        on_off: true,
+      })
+      setPriceDisplay("")
+    }
+  }, [additional])
+
+  const handlePriceChange = (value: string) => {
+    const cleaned = value.replace(/[^\d]/g, "")
+    if (cleaned.length === 0) {
+      setPriceDisplay("")
+      setFormData((prev) => ({ ...prev, price: 0 }))
+      return
+    }
+    const numValue = Number.parseInt(cleaned) / 100
+    setFormData((prev) => ({ ...prev, price: numValue }))
+    setPriceDisplay(formatCurrency(numValue))
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.name.trim()) return
+    onSave(formData)
+  }
+
+  return (
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>{additional ? "Editar Adicional" : "Novo Adicional"}</DialogTitle>
+      </DialogHeader>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="text-sm font-medium">Nome *</label>
+          <Input
+            value={formData.name}
+            onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+            placeholder="Nome do adicional"
+            required
+          />
+        </div>
+        <div>
+          <label className="text-sm font-medium">Preço *</label>
+          <Input
+            type="text"
+            value={priceDisplay}
+            onChange={(e) => handlePriceChange(e.target.value)}
+            placeholder="R$ 0,00"
+            required
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={formData.on_off}
+            onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, on_off: checked }))}
+          />
+          <label className="text-sm font-medium">Adicional ativo</label>
+        </div>
+        <div className="flex gap-2 pt-4">
+          <Button type="button" variant="outline" onClick={onClose} className="flex-1 bg-transparent">
+            Cancelar
+          </Button>
+          <Button type="submit" className="flex-1">
+            Salvar
+          </Button>
+        </div>
+      </form>
+    </DialogContent>
+  )
+}
+
+function PrintLocationDialog({
+  printLocation,
+  onSave,
+  onClose,
+}: {
+  printLocation: PrintLocation | null
+  onSave: (data: Partial<PrintLocation>) => void
+  onClose: () => void
+}) {
+  const [formData, setFormData] = useState({
+    name: "",
+    active: true,
+  })
+
+  useEffect(() => {
+    if (printLocation) {
+      setFormData({
+        name: printLocation.name || "",
+        active: printLocation.active ?? true,
+      })
+    } else {
+      setFormData({
+        name: "",
+        active: true,
+      })
+    }
+  }, [printLocation])
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.name.trim()) return
+    onSave(formData)
+  }
+
+  return (
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>{printLocation ? "Editar Local de Impressão" : "Novo Local de Impressão"}</DialogTitle>
+      </DialogHeader>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="text-sm font-medium">Nome *</label>
+          <Input
+            value={formData.name}
+            onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+            placeholder="Nome do local de impressão"
+            required
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={formData.active}
+            onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, active: checked }))}
+          />
+          <label className="text-sm font-medium">Local ativo</label>
+        </div>
+        <div className="flex gap-2 pt-4">
+          <Button type="button" variant="outline" onClick={onClose} className="flex-1 bg-transparent">
+            Cancelar
+          </Button>
+          <Button type="submit" className="flex-1">
+            Salvar
+          </Button>
+        </div>
+      </form>
+    </DialogContent>
   )
 }
