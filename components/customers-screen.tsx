@@ -16,7 +16,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination"
-import { Search, MessageCircle, Edit, Phone, Plus, Trash2, Eye, EyeOff } from "lucide-react"
+import { Search, MessageCircle, Edit, Phone, Plus, Trash2 } from "lucide-react"
 
 interface Customer {
   id: string
@@ -37,7 +37,6 @@ export function CustomersScreen() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
-  const [showInactive, setShowInactive] = useState(false)
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
@@ -47,7 +46,7 @@ export function CustomersScreen() {
 
   useEffect(() => {
     loadCustomers()
-  }, [currentPage, searchTerm, showInactive])
+  }, [currentPage, searchTerm])
 
   const loadCustomers = async () => {
     setLoading(true)
@@ -56,7 +55,6 @@ export function CustomersScreen() {
         page: currentPage.toString(),
         limit: "10",
         search: searchTerm,
-        showInactive: showInactive.toString(),
       })
 
       const response = await fetch(`/api/customers?${params}`)
@@ -210,26 +208,19 @@ export function CustomersScreen() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Clientes</h1>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Switch checked={showInactive} onCheckedChange={setShowInactive} />
-            <span className="text-sm font-medium">Mostrar inativos</span>
-            {showInactive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={() => setSelectedCustomer(null)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Novo Cliente
-              </Button>
-            </DialogTrigger>
-            <CustomerDialog
-              customer={selectedCustomer}
-              onSave={handleSaveCustomer}
-              onClose={() => setIsDialogOpen(false)}
-            />
-          </Dialog>
-        </div>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button onClick={() => setSelectedCustomer(null)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Novo Cliente
+            </Button>
+          </DialogTrigger>
+          <CustomerDialog
+            customer={selectedCustomer}
+            onSave={handleSaveCustomer}
+            onClose={() => setIsDialogOpen(false)}
+          />
+        </Dialog>
       </div>
 
       <div className="relative">
@@ -394,6 +385,29 @@ function CustomerDialog({
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    if (customer) {
+      setFormData({
+        name: customer.name || "",
+        phone: customer.phone || "",
+        address: customer.address || "",
+        email: customer.email || "",
+        notes: customer.notes || "",
+        on_off: customer.on_off ?? true,
+      })
+    } else {
+      setFormData({
+        name: "",
+        phone: "",
+        address: "",
+        email: "",
+        notes: "",
+        on_off: true,
+      })
+    }
+    setErrors({})
+  }, [customer])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}

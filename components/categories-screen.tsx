@@ -16,7 +16,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination"
-import { Plus, Search, Edit, Trash2, Eye, EyeOff } from "lucide-react"
+import { Plus, Search, Edit, Trash2 } from "lucide-react"
 
 interface Category {
   id: string
@@ -34,7 +34,6 @@ export function CategoriesScreen() {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
-  const [showInactive, setShowInactive] = useState(false)
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
@@ -44,7 +43,7 @@ export function CategoriesScreen() {
 
   useEffect(() => {
     loadCategories()
-  }, [currentPage, searchTerm, showInactive])
+  }, [currentPage, searchTerm])
 
   const loadCategories = async () => {
     setLoading(true)
@@ -53,7 +52,6 @@ export function CategoriesScreen() {
         page: currentPage.toString(),
         limit: "10",
         search: searchTerm,
-        showInactive: showInactive.toString(),
       })
 
       const response = await fetch(`/api/categories?${params}`)
@@ -188,26 +186,19 @@ export function CategoriesScreen() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Categorias</h1>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Switch checked={showInactive} onCheckedChange={setShowInactive} />
-            <span className="text-sm font-medium">Mostrar inativos</span>
-            {showInactive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={() => setSelectedCategory(null)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Nova Categoria
-              </Button>
-            </DialogTrigger>
-            <CategoryDialog
-              category={selectedCategory}
-              onSave={handleSaveCategory}
-              onClose={() => setIsDialogOpen(false)}
-            />
-          </Dialog>
-        </div>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button onClick={() => setSelectedCategory(null)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Nova Categoria
+            </Button>
+          </DialogTrigger>
+          <CategoryDialog
+            category={selectedCategory}
+            onSave={handleSaveCategory}
+            onClose={() => setIsDialogOpen(false)}
+          />
+        </Dialog>
       </div>
 
       <div className="relative">
@@ -341,6 +332,23 @@ function CategoryDialog({
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    if (category) {
+      setFormData({
+        name: category.name || "",
+        description: category.description || "",
+        on_off: category.on_off ?? true,
+      })
+    } else {
+      setFormData({
+        name: "",
+        description: "",
+        on_off: true,
+      })
+    }
+    setErrors({})
+  }, [category])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}

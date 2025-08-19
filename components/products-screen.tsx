@@ -284,10 +284,12 @@ export function ProductsScreen() {
                   <td className="p-4">
                     <div className="flex items-center gap-2">
                       <Switch
-                        checked={product?.on_off ?? false} // usando on_off em vez de active
+                        checked={product?.on_off ?? false}
                         onCheckedChange={() => toggleProductStatus(product.id)}
                       />
-                      
+                      <span className={product?.on_off ? "text-green-600" : "text-gray-400"}>
+                        {product?.on_off ? "Ativo" : "Inativo"}
+                      </span>
                     </div>
                   </td>
                   <td className="p-4">
