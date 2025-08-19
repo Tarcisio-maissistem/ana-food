@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { Plus, Search, Edit, Trash2 } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Plus, Search, Edit, Trash2, Printer, Package, Tag } from "lucide-react"
 import {
   Pagination,
   PaginationContent,
@@ -26,8 +27,29 @@ interface Product {
   price: number
   description?: string
   image?: string
-  on_off: boolean // usando on_off em vez de active para compatibilidade com banco
+  on_off: boolean
   complements: string[]
+  print_location_id?: string
+}
+
+interface Category {
+  id: string
+  name: string
+  on_off: boolean
+  print_location_id?: string
+}
+
+interface Additional {
+  id: string
+  name: string
+  price: number
+  on_off: boolean
+}
+
+interface PrintLocation {
+  id: string
+  name: string
+  active: boolean
 }
 
 const categories = ["Hambúrgueres", "Pizzas", "Bebidas", "Sobremesas", "Acompanhamentos"]
@@ -61,6 +83,11 @@ export function ProductsScreen() {
     total: 0,
     totalPages: 0,
   })
+
+  const [categoriesList, setCategoriesList] = useState<Category[]>([])
+  const [additionalsList, setAdditionalsList] = useState<Additional[]>([])
+  const [printLocationsList, setPrintLocationsList] = useState<PrintLocation[]>([])
+  const [activeTab, setActiveTab] = useState("products")
 
   const handleSaveProduct = async (data: Partial<Product>) => {
     try {
@@ -166,9 +193,47 @@ export function ProductsScreen() {
     }
   }
 
-  useEffect(() => {
-    loadProducts()
-  }, [currentPage, searchTerm, categoryFilter])
+  const loadCategories = async () => {
+    try {
+      const response = await fetch("/api/categories", {
+        headers: { "X-User-Email": "tarcisiorp16@gmail.com" },
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setCategoriesList(Array.isArray(data) ? data : [])
+      }
+    } catch (error) {
+      console.error("Erro ao carregar categorias:", error)
+    }
+  }
+
+  const loadAdditionals = async () => {
+    try {
+      const response = await fetch("/api/additionals", {
+        headers: { "X-User-Email": "tarcisiorp16@gmail.com" },
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setAdditionalsList(Array.isArray(data) ? data : [])
+      }
+    } catch (error) {
+      console.error("Erro ao carregar adicionais:", error)
+    }
+  }
+
+  const loadPrintLocations = async () => {
+    try {
+      const response = await fetch("/api/print-locations", {
+        headers: { "X-User-Email": "tarcisiorp16@gmail.com" },
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setPrintLocationsList(Array.isArray(data) ? data : [])
+      }
+    } catch (error) {
+      console.error("Erro ao carregar locais de impressão:", error)
+    }
+  }
 
   const loadProducts = async () => {
     setLoading(true)
@@ -221,7 +286,12 @@ export function ProductsScreen() {
     }
   }
 
-  const filteredProducts = products
+  useEffect(() => {
+    loadProducts()
+    loadCategories()
+    loadAdditionals()
+    loadPrintLocations()
+  }, [currentPage, searchTerm, categoryFilter])
 
   if (loading) {
     return (
@@ -234,7 +304,7 @@ export function ProductsScreen() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Produtos</h1>
+        <h1 className="text-3xl font-bold">Gestão de Produtos</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={() => setSelectedProduct(null)}>
@@ -242,145 +312,191 @@ export function ProductsScreen() {
               Novo Produto
             </Button>
           </DialogTrigger>
-          <ProductDialog product={selectedProduct} onSave={handleSaveProduct} onClose={() => setIsDialogOpen(false)} />
+          <ProductDialog
+            product={selectedProduct}
+            onSave={handleSaveProduct}
+            onClose={() => setIsDialogOpen(false)}
+            printLocations={printLocationsList}
+            categories={categoriesList}
+          />
         </Dialog>
       </div>
 
-      {/* Filtros */}
-      <div className="flex flex-col md:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <Input
-            placeholder="Buscar produtos..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-48">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todas">Todas as categorias</SelectItem>
-            {categories.map((category) => (
-              <SelectItem key={category} value={category}>
-                {category}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="products" className="flex items-center gap-2">
+            <Package className="w-4 h-4" />
+            Produtos
+          </TabsTrigger>
+          <TabsTrigger value="categories" className="flex items-center gap-2">
+            <Tag className="w-4 h-4" />
+            Categorias
+          </TabsTrigger>
+          <TabsTrigger value="additionals" className="flex items-center gap-2">
+            <Plus className="w-4 h-4" />
+            Adicionais
+          </TabsTrigger>
+          <TabsTrigger value="print-locations" className="flex items-center gap-2">
+            <Printer className="w-4 h-4" />
+            Locais de Impressão
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Lista de Produtos */}
-      <div className="bg-white rounded-lg border">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="border-b bg-gray-50">
-              <tr>
-                <th className="text-left p-4 font-semibold">Nome</th>
-                <th className="text-left p-4 font-semibold">Categoria</th>
-                <th className="text-left p-4 font-semibold">Preço</th>
-                <th className="text-left p-4 font-semibold">Status</th>
-                <th className="text-left p-4 font-semibold">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredProducts.map((product) => (
-                <tr key={product.id} className="border-b hover:bg-gray-50">
-                  <td className="p-4">
-                    <div>
-                      <div className="font-medium">{product?.name || "Nome não informado"}</div>
-                      {product?.description && (
-                        <div className="text-sm text-gray-600 truncate max-w-xs">{product.description}</div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <Badge variant="outline">{product?.category || "Sem categoria"}</Badge>
-                  </td>
-                  <td className="p-4 font-medium">{formatCurrency(product?.price || 0)}</td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={product?.on_off ?? false}
-                        onCheckedChange={() => toggleProductStatus(product.id)}
-                      />
-                      <span className={product?.on_off ? "text-green-600" : "text-gray-400"}>
-                        {product?.on_off ? "Ativo" : "Inativo"}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedProduct(product)
-                          setIsDialogOpen(true)
-                        }}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeleteProduct(product.id)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {filteredProducts.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-500">Nenhum produto encontrado</p>
+        <TabsContent value="products" className="space-y-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                placeholder="Buscar produtos..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Todas as categorias</SelectItem>
+                {categories.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        )}
-      </div>
 
-      {pagination.totalPages > 1 && (
-        <div className="flex justify-center">
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                />
-              </PaginationItem>
+          <div className="bg-white rounded-lg border">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="border-b bg-gray-50">
+                  <tr>
+                    <th className="text-left p-4 font-semibold">Nome</th>
+                    <th className="text-left p-4 font-semibold">Categoria</th>
+                    <th className="text-left p-4 font-semibold">Preço</th>
+                    <th className="text-left p-4 font-semibold">Local de Impressão</th>
+                    <th className="text-left p-4 font-semibold">Status</th>
+                    <th className="text-left p-4 font-semibold">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {products.map((product) => (
+                    <tr key={product.id} className="border-b hover:bg-gray-50">
+                      <td className="p-4">
+                        <div>
+                          <div className="font-medium">{product?.name || "Nome não informado"}</div>
+                          {product?.description && (
+                            <div className="text-sm text-gray-600 truncate max-w-xs">{product.description}</div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <Badge variant="outline">{product?.category || "Sem categoria"}</Badge>
+                      </td>
+                      <td className="p-4 font-medium">{formatCurrency(product?.price || 0)}</td>
+                      <td className="p-4">
+                        <Badge variant="secondary">
+                          {printLocationsList.find((pl) => pl.id === product.print_location_id)?.name ||
+                            "Padrão da categoria"}
+                        </Badge>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={product?.on_off ?? false}
+                            onCheckedChange={() => toggleProductStatus(product.id)}
+                          />
+                          <span className={product?.on_off ? "text-green-600" : "text-gray-400"}>
+                            {product?.on_off ? "Ativo" : "Inativo"}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedProduct(product)
+                              setIsDialogOpen(true)
+                            }}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteProduct(product.id)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-              {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((page) => (
-                <PaginationItem key={page}>
-                  <PaginationLink
-                    onClick={() => setCurrentPage(page)}
-                    isActive={currentPage === page}
-                    className="cursor-pointer"
-                  >
-                    {page}
-                  </PaginationLink>
-                </PaginationItem>
-              ))}
+            {products.length === 0 && (
+              <div className="text-center py-12">
+                <p className="text-gray-500">Nenhum produto encontrado</p>
+              </div>
+            )}
+          </div>
 
-              <PaginationItem>
-                <PaginationNext
-                  onClick={() => setCurrentPage(Math.min(pagination.totalPages, currentPage + 1))}
-                  className={
-                    currentPage === pagination.totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"
-                  }
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
-      )}
+          {pagination.totalPages > 1 && (
+            <div className="flex justify-center">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+
+                  {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((page) => (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        onClick={() => setCurrentPage(page)}
+                        isActive={currentPage === page}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() => setCurrentPage(Math.min(pagination.totalPages, currentPage + 1))}
+                      className={
+                        currentPage === pagination.totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"
+                      }
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="categories" className="space-y-4">
+          <CategoriesTab categories={categoriesList} printLocations={printLocationsList} onReload={loadCategories} />
+        </TabsContent>
+
+        <TabsContent value="additionals" className="space-y-4">
+          <AdditionalsTab additionals={additionalsList} onReload={loadAdditionals} />
+        </TabsContent>
+
+        <TabsContent value="print-locations" className="space-y-4">
+          <PrintLocationsTab printLocations={printLocationsList} onReload={loadPrintLocations} />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
@@ -389,18 +505,23 @@ function ProductDialog({
   product,
   onSave,
   onClose,
+  printLocations,
+  categories: categoriesList,
 }: {
   product: Product | null
   onSave: (data: Partial<Product>) => void
   onClose: () => void
+  printLocations: PrintLocation[]
+  categories: Category[]
 }) {
   const [formData, setFormData] = useState({
     name: "",
     category: "",
     price: 0,
     description: "",
-    on_off: true, // usando on_off em vez de active
+    on_off: true,
     complements: [],
+    print_location_id: "",
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -416,6 +537,7 @@ function ProductDialog({
         description: product.description || "",
         on_off: product.on_off ?? true,
         complements: product.complements || [],
+        print_location_id: product.print_location_id || "",
       })
       setPriceDisplay(formatCurrency(product.price || 0))
     } else {
@@ -426,6 +548,7 @@ function ProductDialog({
         description: "",
         on_off: true,
         complements: [],
+        print_location_id: "",
       })
       setPriceDisplay("")
     }
@@ -441,11 +564,9 @@ function ProductDialog({
       return
     }
 
-    // Convert cents to reais (last 2 digits are cents)
     const numValue = Number.parseInt(cleaned) / 100
     setFormData((prev) => ({ ...prev, price: numValue }))
 
-    // Format for display
     const formatted = new Intl.NumberFormat("pt-BR", {
       style: "currency",
       currency: "BRL",
@@ -464,7 +585,6 @@ function ProductDialog({
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
-    // Validação do nome
     if (!formData.name.trim()) {
       newErrors.name = "Nome é obrigatório"
     } else if (formData.name.trim().length < 2) {
@@ -473,19 +593,16 @@ function ProductDialog({
       newErrors.name = "Nome deve ter no máximo 100 caracteres"
     }
 
-    // Validação da categoria
     if (!formData.category) {
       newErrors.category = "Categoria é obrigatória"
     }
 
-    // Validação do preço
     if (!formData.price || formData.price <= 0) {
       newErrors.price = "Preço deve ser maior que zero"
     } else if (formData.price > 9999.99) {
       newErrors.price = "Preço deve ser menor que R$ 9.999,99"
     }
 
-    // Validação da descrição (opcional, mas se preenchida deve ter tamanho mínimo)
     if (formData.description && formData.description.trim().length > 0 && formData.description.trim().length < 10) {
       newErrors.description = "Descrição deve ter pelo menos 10 caracteres"
     } else if (formData.description && formData.description.length > 500) {
@@ -512,12 +629,11 @@ function ProductDialog({
     setIsSubmitting(true)
 
     try {
-      // Sanitizar dados antes de enviar
       const sanitizedData = {
         ...formData,
         name: formData.name.trim(),
         description: formData.description.trim(),
-        price: Number(formData.price.toFixed(2)), // Garantir 2 casas decimais
+        price: Number(formData.price.toFixed(2)),
       }
 
       await onSave(sanitizedData)
@@ -535,51 +651,74 @@ function ProductDialog({
   }
 
   return (
-    <DialogContent className="max-w-md">
+    <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle>{product ? "Editar Produto" : "Novo Produto"}</DialogTitle>
       </DialogHeader>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="text-sm font-medium">Nome *</label>
-          <Input
-            value={formData.name}
-            onChange={(e) => handleFieldChange("name", e.target.value)}
-            className={errors.name ? "border-red-500" : ""}
-            placeholder="Digite o nome do produto"
-            maxLength={100}
-          />
-          {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
-        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-medium">Nome *</label>
+            <Input
+              value={formData.name}
+              onChange={(e) => handleFieldChange("name", e.target.value)}
+              className={errors.name ? "border-red-500" : ""}
+              placeholder="Digite o nome do produto"
+              maxLength={100}
+            />
+            {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+          </div>
 
-        <div>
-          <label className="text-sm font-medium">Categoria *</label>
-          <Select value={formData.category} onValueChange={(value) => handleFieldChange("category", value)}>
-            <SelectTrigger className={errors.category ? "border-red-500" : ""}>
-              <SelectValue placeholder="Selecione uma categoria" />
-            </SelectTrigger>
-            <SelectContent>
-              {categories.map((category) => (
-                <SelectItem key={category} value={category}>
-                  {category}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.category && <p className="text-red-500 text-xs mt-1">{errors.category}</p>}
-        </div>
+          <div>
+            <label className="text-sm font-medium">Categoria *</label>
+            <Select value={formData.category} onValueChange={(value) => handleFieldChange("category", value)}>
+              <SelectTrigger className={errors.category ? "border-red-500" : ""}>
+                <SelectValue placeholder="Selecione uma categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                {categoriesList.map((category) => (
+                  <SelectItem key={category.id} value={category.name}>
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.category && <p className="text-red-500 text-xs mt-1">{errors.category}</p>}
+          </div>
 
-        <div>
-          <label className="text-sm font-medium">Preço *</label>
-          <Input
-            type="text"
-            value={priceDisplay}
-            onChange={(e) => handlePriceChange(e.target.value)}
-            className={errors.price ? "border-red-500" : ""}
-            placeholder="R$ 0,00"
-          />
-          {errors.price && <p className="text-red-500 text-xs mt-1">{errors.price}</p>}
+          <div>
+            <label className="text-sm font-medium">Preço *</label>
+            <Input
+              type="text"
+              value={priceDisplay}
+              onChange={(e) => handlePriceChange(e.target.value)}
+              className={errors.price ? "border-red-500" : ""}
+              placeholder="R$ 0,00"
+            />
+            {errors.price && <p className="text-red-500 text-xs mt-1">{errors.price}</p>}
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Local de Impressão</label>
+            <Select
+              value={formData.print_location_id}
+              onValueChange={(value) => handleFieldChange("print_location_id", value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Usar padrão da categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="category-default">Usar padrão da categoria</SelectItem>
+                {printLocations.map((location) => (
+                  <SelectItem key={location.id} value={location.id}>
+                    {location.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-gray-500 mt-1">Se não selecionado, usará o local definido na categoria</p>
+          </div>
         </div>
 
         <div>
@@ -624,5 +763,198 @@ function ProductDialog({
         </div>
       </form>
     </DialogContent>
+  )
+}
+
+function CategoriesTab({
+  categories,
+  printLocations,
+  onReload,
+}: {
+  categories: Category[]
+  printLocations: PrintLocation[]
+  onReload: () => void
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">Categorias</h2>
+        <Button size="sm">
+          <Plus className="w-4 h-4 mr-2" />
+          Nova Categoria
+        </Button>
+      </div>
+
+      <div className="bg-white rounded-lg border">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="border-b bg-gray-50">
+              <tr>
+                <th className="text-left p-4 font-semibold">Nome</th>
+                <th className="text-left p-4 font-semibold">Local de Impressão</th>
+                <th className="text-left p-4 font-semibold">Status</th>
+                <th className="text-left p-4 font-semibold">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {categories.map((category) => (
+                <tr key={category.id} className="border-b hover:bg-gray-50">
+                  <td className="p-4 font-medium">{category.name || `Categoria ${category.id.slice(0, 8)}`}</td>
+                  <td className="p-4">
+                    <Badge variant="secondary">
+                      {printLocations.find((pl) => pl.id === category.print_location_id)?.name || "Não definido"}
+                    </Badge>
+                  </td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-2">
+                      <Switch checked={category.on_off} />
+                      <span className={category.on_off ? "text-green-600" : "text-gray-400"}>
+                        {category.on_off ? "Ativo" : "Inativo"}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm">
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 bg-transparent">
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {categories.length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-gray-500">Nenhuma categoria encontrada</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function AdditionalsTab({ additionals, onReload }: { additionals: Additional[]; onReload: () => void }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">Adicionais</h2>
+        <Button size="sm">
+          <Plus className="w-4 h-4 mr-2" />
+          Novo Adicional
+        </Button>
+      </div>
+
+      <div className="bg-white rounded-lg border">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="border-b bg-gray-50">
+              <tr>
+                <th className="text-left p-4 font-semibold">Nome</th>
+                <th className="text-left p-4 font-semibold">Preço</th>
+                <th className="text-left p-4 font-semibold">Status</th>
+                <th className="text-left p-4 font-semibold">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {additionals.map((additional) => (
+                <tr key={additional.id} className="border-b hover:bg-gray-50">
+                  <td className="p-4 font-medium">{additional.name}</td>
+                  <td className="p-4 font-medium">{formatCurrency(additional.price)}</td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-2">
+                      <Switch checked={additional.on_off} />
+                      <span className={additional.on_off ? "text-green-600" : "text-gray-400"}>
+                        {additional.on_off ? "Ativo" : "Inativo"}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm">
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 bg-transparent">
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {additionals.length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-gray-500">Nenhum adicional encontrado</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function PrintLocationsTab({ printLocations, onReload }: { printLocations: PrintLocation[]; onReload: () => void }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">Locais de Impressão</h2>
+        <Button size="sm">
+          <Plus className="w-4 h-4 mr-2" />
+          Novo Local
+        </Button>
+      </div>
+
+      <div className="bg-white rounded-lg border">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="border-b bg-gray-50">
+              <tr>
+                <th className="text-left p-4 font-semibold">Nome</th>
+                <th className="text-left p-4 font-semibold">Status</th>
+                <th className="text-left p-4 font-semibold">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {printLocations.map((location) => (
+                <tr key={location.id} className="border-b hover:bg-gray-50">
+                  <td className="p-4 font-medium">{location.name}</td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-2">
+                      <Switch checked={location.active} />
+                      <span className={location.active ? "text-green-600" : "text-gray-400"}>
+                        {location.active ? "Ativo" : "Inativo"}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm">
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 bg-transparent">
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {printLocations.length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-gray-500">Nenhum local de impressão encontrado</p>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
