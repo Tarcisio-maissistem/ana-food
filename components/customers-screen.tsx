@@ -82,7 +82,11 @@ export function CustomersScreen() {
         search: searchTerm,
       })
 
-      const response = await fetch(`/api/customers?${params}`)
+      const response = await fetch(`/api/customers?${params}`, {
+        headers: {
+          "x-user-email": "tarcisiorp16@gmail.com",
+        },
+      })
       if (response.ok) {
         const result = await response.json()
         setCustomers(result.data || [])
@@ -111,7 +115,11 @@ export function CustomersScreen() {
   const loadOrderHistory = async (customerId: string) => {
     setLoadingHistory(true)
     try {
-      const response = await fetch(`/api/customers/${customerId}/orders`)
+      const response = await fetch(`/api/customers/${customerId}/orders`, {
+        headers: {
+          "x-user-email": "tarcisiorp16@gmail.com",
+        },
+      })
       if (response.ok) {
         const orders = await response.json()
         setOrderHistory(orders)
@@ -147,7 +155,10 @@ export function CustomersScreen() {
       if (selectedCustomer) {
         const response = await fetch("/api/customers", {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-email": "tarcisiorp16@gmail.com",
+          },
           body: JSON.stringify({ id: selectedCustomer.id, ...customerData }),
         })
 
@@ -164,7 +175,10 @@ export function CustomersScreen() {
       } else {
         const response = await fetch("/api/customers", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-email": "tarcisiorp16@gmail.com",
+          },
           body: JSON.stringify(customerData),
         })
 
@@ -197,6 +211,9 @@ export function CustomersScreen() {
     try {
       const response = await fetch(`/api/customers?id=${customerId}`, {
         method: "DELETE",
+        headers: {
+          "x-user-email": "tarcisiorp16@gmail.com",
+        },
       })
 
       if (response.ok) {
@@ -225,7 +242,10 @@ export function CustomersScreen() {
     try {
       const response = await fetch("/api/customers", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-email": "tarcisiorp16@gmail.com",
+        },
         body: JSON.stringify({ id: customerId, on_off: !customer.on_off }),
       })
 

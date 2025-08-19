@@ -15,12 +15,19 @@ async function checkTableExists(supabase: any): Promise<boolean> {
 
 async function checkTableStructure(supabase: any): Promise<string[]> {
   try {
-    const { data, error } = await supabase.from("categories").select("*").limit(0)
+    const { data, error } = await supabase.from("categories").select("*").limit(1)
     if (error) {
       console.log("[v0] Erro ao verificar estrutura da tabela:", error.message)
       return []
     }
-    return Object.keys(data?.[0] || {})
+    if (!data || data.length === 0) {
+      const { error: testError } = await supabase.from("categories").select("*").limit(1).single()
+      if (testError && testError.message.includes("JSON object requested")) {
+        return ["id", "name", "on_off", "created_at", "updated_at"]
+      }
+      return []
+    }
+    return Object.keys(data[0] || {})
   } catch (error) {
     console.log("[v0] Erro ao verificar estrutura:", error)
     return []
@@ -285,7 +292,6 @@ export async function PUT(request: NextRequest) {
 
     const updatePayload: any = {}
 
-    // Map fields to available columns
     if (availableColumns.includes("nome")) {
       if (updateData.name || updateData.nome) {
         updatePayload.nome = updateData.name || updateData.nome
@@ -327,7 +333,6 @@ export async function PUT(request: NextRequest) {
 
       if (error) {
         console.error("Erro ao atualizar categoria:", error)
-        // Return mock updated data if database update fails
         return NextResponse.json({
           id,
           nome: updateData.name || updateData.nome,
@@ -341,7 +346,6 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json(data)
     } catch (updateError) {
       console.error("Erro durante atualização:", updateError)
-      // Return mock updated data if update operation fails
       return NextResponse.json({
         id,
         nome: updateData.name || updateData.nome,

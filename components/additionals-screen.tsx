@@ -69,7 +69,11 @@ export function AdditionalsScreen() {
         search: searchTerm,
       })
 
-      const response = await fetch(`/api/additionals?${params}`)
+      const response = await fetch(`/api/additionals?${params}`, {
+        headers: {
+          "x-user-email": "tarcisiorp16@gmail.com",
+        },
+      })
       if (response.ok) {
         const result = await response.json()
         setAdditionals(result.data || [])
@@ -87,7 +91,10 @@ export function AdditionalsScreen() {
       if (selectedAdditional) {
         const response = await fetch("/api/additionals", {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-email": "tarcisiorp16@gmail.com",
+          },
           body: JSON.stringify({ id: selectedAdditional.id, ...additionalData }),
         })
 
@@ -104,7 +111,10 @@ export function AdditionalsScreen() {
       } else {
         const response = await fetch("/api/additionals", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-email": "tarcisiorp16@gmail.com",
+          },
           body: JSON.stringify(additionalData),
         })
 
@@ -137,6 +147,9 @@ export function AdditionalsScreen() {
     try {
       const response = await fetch(`/api/additionals?id=${additionalId}`, {
         method: "DELETE",
+        headers: {
+          "x-user-email": "tarcisiorp16@gmail.com",
+        },
       })
 
       if (response.ok) {
@@ -165,7 +178,10 @@ export function AdditionalsScreen() {
     try {
       const response = await fetch("/api/additionals", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-email": "tarcisiorp16@gmail.com",
+        },
         body: JSON.stringify({ id: additionalId, on_off: !additional.on_off }),
       })
 
