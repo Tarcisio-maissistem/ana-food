@@ -1,15 +1,17 @@
 "use client"
 
-import type React from "react"
+import { Badge } from "@/components/ui/badge"
+
+import { DialogTrigger } from "@/components/ui/dialog"
+
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Pagination,
   PaginationContent,
@@ -19,7 +21,8 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination"
 import { Edit, Trash2, Plus, Search, Package, Tag, Printer } from "lucide-react"
-import Swal from "sweetalert2"
+import { useSweetAlert } from "@/hooks/use-sweet-alert"
+import type React from "react"
 import { Textarea } from "@/components/ui/textarea"
 
 interface Product {
@@ -71,7 +74,8 @@ const parseCurrency = (value: string): number => {
   return Number.parseFloat(cleaned) || 0
 }
 
-export function ProductsScreen() {
+function ProductsScreen() {
+  const { fire: Swal, SweetAlertComponent } = useSweetAlert()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
@@ -151,12 +155,12 @@ export function ProductsScreen() {
   const [isSaving, setIsSaving] = useState(false)
 
   const handleDeleteProduct = async (productId: string) => {
-    const result = await Swal.fire({
+    const result = await Swal({
       title: "Tem certeza?",
       text: "Você não poderá reverter esta ação!",
       icon: "warning",
       showCancelButton: true,
-      confirmButtonColor: "#d33",
+      confirmButtonColor: "red",
       cancelButtonColor: "#3085d6",
       confirmButtonText: "Sim, excluir!",
       cancelButtonText: "Cancelar",
@@ -173,12 +177,10 @@ export function ProductsScreen() {
       })
 
       if (response.ok) {
-        await Swal.fire({
+        await Swal({
           title: "Excluído!",
           text: "Produto excluído com sucesso.",
           icon: "success",
-          timer: 2000,
-          showConfirmButton: false,
         })
         loadProducts() // Recarregar lista
       } else {
@@ -186,7 +188,7 @@ export function ProductsScreen() {
       }
     } catch (error) {
       console.error("Erro ao excluir produto:", error)
-      await Swal.fire({
+      await Swal({
         title: "Erro!",
         text: "Erro ao excluir produto.",
         icon: "error",
@@ -223,12 +225,10 @@ export function ProductsScreen() {
       })
 
       if (response.ok) {
-        await Swal.fire({
+        await Swal({
           title: "Sucesso!",
           text: `Produto ${selectedProduct ? "atualizado" : "criado"} com sucesso.`,
           icon: "success",
-          timer: 2000,
-          showConfirmButton: false,
         })
         setIsDialogOpen(false)
         setSelectedProduct(null)
@@ -239,7 +239,7 @@ export function ProductsScreen() {
       }
     } catch (error) {
       console.error("Erro ao salvar produto:", error)
-      await Swal.fire({
+      await Swal({
         title: "Erro!",
         text: "Erro ao salvar produto.",
         icon: "error",
@@ -412,12 +412,10 @@ export function ProductsScreen() {
       })
 
       if (response.ok) {
-        await Swal.fire({
+        await Swal({
           title: "Sucesso!",
           text: `Categoria ${selectedCategory ? "atualizada" : "criada"} com sucesso.`,
           icon: "success",
-          timer: 2000,
-          showConfirmButton: false,
         })
         setIsCategoryDialogOpen(false)
         setSelectedCategory(null)
@@ -428,7 +426,7 @@ export function ProductsScreen() {
       }
     } catch (error) {
       console.error("Erro ao salvar categoria:", error)
-      await Swal.fire({
+      await Swal({
         title: "Erro!",
         text: "Erro ao salvar categoria.",
         icon: "error",
@@ -464,12 +462,10 @@ export function ProductsScreen() {
       })
 
       if (response.ok) {
-        await Swal.fire({
+        await Swal({
           title: "Sucesso!",
           text: `Adicional ${selectedAdditional ? "atualizado" : "criado"} com sucesso.`,
           icon: "success",
-          timer: 2000,
-          showConfirmButton: false,
         })
         setIsAdditionalDialogOpen(false)
         setSelectedAdditional(null)
@@ -480,7 +476,7 @@ export function ProductsScreen() {
       }
     } catch (error) {
       console.error("Erro ao salvar adicional:", error)
-      await Swal.fire({
+      await Swal({
         title: "Erro!",
         text: "Erro ao salvar adicional.",
         icon: "error",
@@ -509,11 +505,10 @@ export function ProductsScreen() {
       })
 
       if (response.ok) {
-        // @ts-ignore
-        window.showToast?.({
-          type: "success",
-          title: "Sucesso",
-          description: selectedPrintLocation ? "Local atualizado com sucesso" : "Local criado com sucesso",
+        await Swal({
+          title: "Sucesso!",
+          text: selectedPrintLocation ? "Local atualizado com sucesso" : "Local criado com sucesso",
+          icon: "success",
         })
         setIsPrintLocationDialogOpen(false)
         loadPrintLocations()
@@ -522,14 +517,14 @@ export function ProductsScreen() {
       }
     } catch (error) {
       console.error("Erro ao salvar local de impressão:", error)
-      // @ts-ignore
-      window.showToast?.({
-        type: "error",
-        title: "Erro",
-        description: "Erro ao salvar local de impressão. Tente novamente.",
+      await Swal({
+        title: "Erro!",
+        text: "Erro ao salvar local de impressão. Tente novamente.",
+        icon: "error",
+        confirmButtonText: "OK",
       })
     } finally {
-      setIsPrintLocationSaving(false) // Re-enable button after operation
+      setIsPrintLocationSaving(false)
     }
   }
 
@@ -613,6 +608,7 @@ export function ProductsScreen() {
 
   return (
     <div className="space-y-6">
+      <SweetAlertComponent />
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Gestão de Produtos</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -1450,3 +1446,5 @@ function PrintLocationDialog({
     </DialogContent>
   )
 }
+
+export { ProductsScreen }

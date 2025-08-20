@@ -41,7 +41,7 @@
     "react-hook-form": "^7.53.1",
     "react-hot-toast": "latest",
     "recharts": "latest",
-    "sweetalert2": "latest",
+    "sweetalert2": "^11.14.5",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
     "zod": "^3.23.8"
