@@ -98,6 +98,8 @@ export function CustomersScreen() {
           type: "error",
           title: "Erro",
           description: "Erro ao carregar clientes",
+          duration: 4000,
+          className: "animate-in slide-in-from-right-full",
         })
       }
     } catch (error) {
@@ -107,6 +109,8 @@ export function CustomersScreen() {
         type: "error",
         title: "Erro",
         description: "Erro ao conectar com o servidor",
+        duration: 4000,
+        className: "animate-in slide-in-from-right-full",
       })
     } finally {
       setLoading(false)
@@ -130,6 +134,8 @@ export function CustomersScreen() {
           type: "error",
           title: "Erro",
           description: "Erro ao carregar histórico de pedidos",
+          duration: 4000,
+          className: "animate-in slide-in-from-right-full",
         })
       }
     } catch (error) {
@@ -139,6 +145,8 @@ export function CustomersScreen() {
         type: "error",
         title: "Erro",
         description: "Erro ao conectar com o servidor",
+        duration: 4000,
+        className: "animate-in slide-in-from-right-full",
       })
     } finally {
       setLoadingHistory(false)
@@ -174,6 +182,8 @@ export function CustomersScreen() {
             type: "success",
             title: "Sucesso",
             description: "Cliente atualizado com sucesso!",
+            duration: 3000,
+            className: "animate-in slide-in-from-right-full",
           })
         }
       } else {
@@ -194,6 +204,8 @@ export function CustomersScreen() {
             type: "success",
             title: "Sucesso",
             description: "Cliente criado com sucesso!",
+            duration: 3000,
+            className: "animate-in slide-in-from-right-full",
           })
         }
       }
@@ -207,6 +219,8 @@ export function CustomersScreen() {
         type: "error",
         title: "Erro",
         description: "Erro ao salvar cliente",
+        duration: 4000,
+        className: "animate-in slide-in-from-right-full",
       })
     } finally {
       setIsSaving(false) // Re-enable button after operation
@@ -229,6 +243,8 @@ export function CustomersScreen() {
           type: "success",
           title: "Sucesso",
           description: "Cliente removido com sucesso!",
+          duration: 3000,
+          className: "animate-in slide-in-from-right-full",
         })
       }
     } catch (error) {
@@ -237,6 +253,8 @@ export function CustomersScreen() {
         type: "error",
         title: "Erro",
         description: "Erro ao remover cliente",
+        duration: 4000,
+        className: "animate-in slide-in-from-right-full",
       })
     }
   }
@@ -263,6 +281,8 @@ export function CustomersScreen() {
           type: "success",
           title: "Sucesso",
           description: `Cliente ${updatedCustomer.on_off ? "ativado" : "desativado"} com sucesso!`,
+          duration: 3000,
+          className: "animate-in slide-in-from-right-full",
         })
       }
     } catch (error) {
@@ -271,6 +291,8 @@ export function CustomersScreen() {
         type: "error",
         title: "Erro",
         description: "Erro ao alterar status do cliente",
+        duration: 4000,
+        className: "animate-in slide-in-from-right-full",
       })
     }
   }

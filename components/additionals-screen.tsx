@@ -110,6 +110,8 @@ export function AdditionalsScreen() {
             type: "success",
             title: "Sucesso",
             description: "Adicional atualizado com sucesso!",
+            duration: 3000,
+            className: "animate-in slide-in-from-right-full",
           })
         }
       } else {
@@ -130,6 +132,8 @@ export function AdditionalsScreen() {
             type: "success",
             title: "Sucesso",
             description: "Adicional criado com sucesso!",
+            duration: 3000,
+            className: "animate-in slide-in-from-right-full",
           })
         }
       }
@@ -143,6 +147,8 @@ export function AdditionalsScreen() {
         type: "error",
         title: "Erro",
         description: "Erro ao salvar adicional",
+        duration: 4000,
+        className: "animate-in slide-in-from-right-full",
       })
     } finally {
       setIsSaving(false) // Re-enable button after operation
@@ -165,6 +171,8 @@ export function AdditionalsScreen() {
           type: "success",
           title: "Sucesso",
           description: "Adicional removido com sucesso!",
+          duration: 3000,
+          className: "animate-in slide-in-from-right-full",
         })
       }
     } catch (error) {
@@ -173,6 +181,8 @@ export function AdditionalsScreen() {
         type: "error",
         title: "Erro",
         description: "Erro ao remover adicional",
+        duration: 4000,
+        className: "animate-in slide-in-from-right-full",
       })
     }
   }
@@ -199,6 +209,8 @@ export function AdditionalsScreen() {
           type: "success",
           title: "Sucesso",
           description: `Adicional ${updatedAdditional.on_off ? "ativado" : "desativado"} com sucesso!`,
+          duration: 3000,
+          className: "animate-in slide-in-from-right-full",
         })
       }
     } catch (error) {
@@ -207,6 +219,8 @@ export function AdditionalsScreen() {
         type: "error",
         title: "Erro",
         description: "Erro ao alterar status do adicional",
+        duration: 4000,
+        className: "animate-in slide-in-from-right-full",
       })
     }
   }
