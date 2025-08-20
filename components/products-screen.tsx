@@ -4,21 +4,23 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
+import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, Search, Edit, Trash2, Printer, Package, Tag } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 import {
   Pagination,
   PaginationContent,
   PaginationItem,
   PaginationLink,
-  PaginationPrevious,
   PaginationNext,
+  PaginationPrevious,
 } from "@/components/ui/pagination"
+import { Edit, Trash2, Plus, Search, Package, Tag, Printer } from "lucide-react"
+import Swal from "sweetalert2"
+import { Textarea } from "@/components/ui/textarea"
 
 interface Product {
   id: string
@@ -124,48 +126,127 @@ export function ProductsScreen() {
   const [printLocationsSearch, setPrintLocationsSearch] = useState("")
 
   const [isProductSaving, setIsProductSaving] = useState(false)
-  const [isCategorySaving, setIsCategorySaving] = useState(false)
-  const [isAdditionalSaving, setIsAdditionalSaving] = useState(false)
+  const [categoryFormData, setCategoryFormData] = useState({
+    name: "",
+    print_location_id: "",
+    active: true,
+  })
+  const [additionalFormData, setAdditionalFormData] = useState({
+    name: "",
+    price: "",
+    active: true,
+  })
   const [isPrintLocationSaving, setIsPrintLocationSaving] = useState(false)
 
-  const handleSaveProduct = async (data: Partial<Product>) => {
-    if (isProductSaving) return // Prevent double-click
-    setIsProductSaving(true)
+  const [isCategorySaving, setIsCategorySaving] = useState(false)
+  const [isAdditionalSaving, setIsAdditionalSaving] = useState(false)
+  const [formData, setFormData] = useState({
+    name: "",
+    price: "",
+    category: "",
+    description: "",
+    print_location_id: "",
+    active: true,
+  })
+  const [isSaving, setIsSaving] = useState(false)
+
+  const handleDeleteProduct = async (productId: string) => {
+    const result = await Swal.fire({
+      title: "Tem certeza?",
+      text: "Você não poderá reverter esta ação!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Sim, excluir!",
+      cancelButtonText: "Cancelar",
+    })
+
+    if (!result.isConfirmed) return
 
     try {
-      const method = selectedProduct ? "PUT" : "POST"
-      const url = selectedProduct ? `/api/products/${selectedProduct.id}` : "/api/products"
-
-      const response = await fetch(url, {
-        method,
+      const response = await fetch(`/api/products?id=${productId}`, {
+        method: "DELETE",
         headers: {
-          "Content-Type": "application/json",
+          "X-User-Email": "tarcisiorp16@gmail.com",
         },
-        body: JSON.stringify(data),
       })
 
       if (response.ok) {
-        // @ts-ignore
-        window.showToast?.({
-          type: "success",
-          title: "Sucesso",
-          description: selectedProduct ? "Produto atualizado com sucesso" : "Produto criado com sucesso",
+        await Swal.fire({
+          title: "Excluído!",
+          text: "Produto excluído com sucesso.",
+          icon: "success",
+          timer: 2000,
+          showConfirmButton: false,
         })
-        setIsDialogOpen(false)
         loadProducts() // Recarregar lista
       } else {
         throw new Error("Erro na resposta da API")
       }
     } catch (error) {
+      console.error("Erro ao excluir produto:", error)
+      await Swal.fire({
+        title: "Erro!",
+        text: "Erro ao excluir produto.",
+        icon: "error",
+        confirmButtonText: "OK",
+      })
+    }
+  }
+
+  const handleSaveProduct = async () => {
+    if (isSaving) return
+    setIsSaving(true)
+
+    try {
+      const productData = {
+        name: formData.name,
+        price: Number.parseFloat(formData.price.replace(/[^\d,]/g, "").replace(",", ".")),
+        category: formData.category,
+        description: formData.description,
+        print_location_id: formData.print_location_id === "category-default" ? null : formData.print_location_id,
+        active: formData.active,
+      }
+
+      const url = "/api/products"
+      const method = selectedProduct ? "PUT" : "POST"
+      const body = selectedProduct ? { id: selectedProduct.id, ...productData } : productData
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Email": "tarcisiorp16@gmail.com",
+        },
+        body: JSON.stringify(body),
+      })
+
+      if (response.ok) {
+        await Swal.fire({
+          title: "Sucesso!",
+          text: `Produto ${selectedProduct ? "atualizado" : "criado"} com sucesso.`,
+          icon: "success",
+          timer: 2000,
+          showConfirmButton: false,
+        })
+        setIsDialogOpen(false)
+        setSelectedProduct(null)
+        setFormData({ name: "", price: "", category: "", description: "", print_location_id: "", active: true })
+        loadProducts()
+      } else {
+        throw new Error("Erro na resposta da API")
+      }
+    } catch (error) {
       console.error("Erro ao salvar produto:", error)
-      // @ts-ignore
-      window.showToast?.({
-        type: "error",
-        title: "Erro",
-        description: "Erro ao salvar produto. Tente novamente.",
+      await Swal.fire({
+        title: "Erro!",
+        text: "Erro ao salvar produto.",
+        icon: "error",
+        confirmButtonText: "OK",
       })
     } finally {
-      setIsProductSaving(false) // Re-enable button after operation
+      setIsSaving(false)
     }
   }
 
@@ -203,36 +284,6 @@ export function ProductsScreen() {
         type: "error",
         title: "Erro",
         description: "Erro ao alterar status do produto",
-      })
-    }
-  }
-
-  const handleDeleteProduct = async (productId: string) => {
-    if (!confirm("Tem certeza que deseja excluir este produto?")) return
-
-    try {
-      const response = await fetch(`/api/products/${productId}`, {
-        method: "DELETE",
-      })
-
-      if (response.ok) {
-        // @ts-ignore
-        window.showToast?.({
-          type: "success",
-          title: "Sucesso",
-          description: "Produto excluído com sucesso",
-        })
-        loadProducts() // Recarregar lista
-      } else {
-        throw new Error("Erro na resposta da API")
-      }
-    } catch (error) {
-      console.error("Erro ao excluir produto:", error)
-      // @ts-ignore
-      window.showToast?.({
-        type: "error",
-        title: "Erro",
-        description: "Erro ao excluir produto",
       })
     }
   }
@@ -336,13 +387,20 @@ export function ProductsScreen() {
     }
   }
 
-  const handleSaveCategory = async (data: Partial<Category>) => {
-    if (isCategorySaving) return // Prevent double-click
+  const handleSaveCategory = async () => {
+    if (isCategorySaving) return
     setIsCategorySaving(true)
 
     try {
+      const categoryData = {
+        name: categoryFormData.name,
+        print_location_id: categoryFormData.print_location_id,
+        active: categoryFormData.active,
+      }
+
+      const url = "/api/categories"
       const method = selectedCategory ? "PUT" : "POST"
-      const url = selectedCategory ? `/api/categories/${selectedCategory.id}` : "/api/categories"
+      const body = selectedCategory ? { id: selectedCategory.id, ...categoryData } : categoryData
 
       const response = await fetch(url, {
         method,
@@ -350,41 +408,51 @@ export function ProductsScreen() {
           "Content-Type": "application/json",
           "X-User-Email": "tarcisiorp16@gmail.com",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(body),
       })
 
       if (response.ok) {
-        // @ts-ignore
-        window.showToast?.({
-          type: "success",
-          title: "Sucesso",
-          description: selectedCategory ? "Categoria atualizada com sucesso" : "Categoria criada com sucesso",
+        await Swal.fire({
+          title: "Sucesso!",
+          text: `Categoria ${selectedCategory ? "atualizada" : "criada"} com sucesso.`,
+          icon: "success",
+          timer: 2000,
+          showConfirmButton: false,
         })
         setIsCategoryDialogOpen(false)
+        setSelectedCategory(null)
+        setCategoryFormData({ name: "", print_location_id: "", active: true })
         loadCategories()
       } else {
         throw new Error("Erro na resposta da API")
       }
     } catch (error) {
       console.error("Erro ao salvar categoria:", error)
-      // @ts-ignore
-      window.showToast?.({
-        type: "error",
-        title: "Erro",
-        description: "Erro ao salvar categoria. Tente novamente.",
+      await Swal.fire({
+        title: "Erro!",
+        text: "Erro ao salvar categoria.",
+        icon: "error",
+        confirmButtonText: "OK",
       })
     } finally {
-      setIsCategorySaving(false) // Re-enable button after operation
+      setIsCategorySaving(false)
     }
   }
 
-  const handleSaveAdditional = async (data: Partial<Additional>) => {
-    if (isAdditionalSaving) return // Prevent double-click
+  const handleSaveAdditional = async () => {
+    if (isAdditionalSaving) return
     setIsAdditionalSaving(true)
 
     try {
+      const additionalData = {
+        name: additionalFormData.name,
+        price: Number.parseFloat(additionalFormData.price.replace(/[^\d,]/g, "").replace(",", ".")),
+        active: additionalFormData.active,
+      }
+
+      const url = "/api/additionals"
       const method = selectedAdditional ? "PUT" : "POST"
-      const url = selectedAdditional ? `/api/additionals/${selectedAdditional.id}` : "/api/additionals"
+      const body = selectedAdditional ? { id: selectedAdditional.id, ...additionalData } : additionalData
 
       const response = await fetch(url, {
         method,
@@ -392,31 +460,34 @@ export function ProductsScreen() {
           "Content-Type": "application/json",
           "X-User-Email": "tarcisiorp16@gmail.com",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(body),
       })
 
       if (response.ok) {
-        // @ts-ignore
-        window.showToast?.({
-          type: "success",
-          title: "Sucesso",
-          description: selectedAdditional ? "Adicional atualizado com sucesso" : "Adicional criado com sucesso",
+        await Swal.fire({
+          title: "Sucesso!",
+          text: `Adicional ${selectedAdditional ? "atualizado" : "criado"} com sucesso.`,
+          icon: "success",
+          timer: 2000,
+          showConfirmButton: false,
         })
         setIsAdditionalDialogOpen(false)
+        setSelectedAdditional(null)
+        setAdditionalFormData({ name: "", price: "", active: true })
         loadAdditionals()
       } else {
         throw new Error("Erro na resposta da API")
       }
     } catch (error) {
       console.error("Erro ao salvar adicional:", error)
-      // @ts-ignore
-      window.showToast?.({
-        type: "error",
-        title: "Erro",
-        description: "Erro ao salvar adicional. Tente novamente.",
+      await Swal.fire({
+        title: "Erro!",
+        text: "Erro ao salvar adicional.",
+        icon: "error",
+        confirmButtonText: "OK",
       })
     } finally {
-      setIsAdditionalSaving(false) // Re-enable button after operation
+      setIsAdditionalSaving(false)
     }
   }
 
@@ -546,19 +617,145 @@ export function ProductsScreen() {
         <h1 className="text-3xl font-bold">Gestão de Produtos</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={() => setSelectedProduct(null)}>
+            <Button
+              onClick={() => {
+                setSelectedProduct(null)
+                setFormData({ name: "", price: "", category: "", description: "", print_location_id: "", active: true })
+              }}
+            >
               <Plus className="w-4 h-4 mr-2" />
               Novo Produto
             </Button>
           </DialogTrigger>
-          <ProductDialog
-            product={selectedProduct}
-            onSave={handleSaveProduct}
-            onClose={() => setIsDialogOpen(false)}
-            printLocations={printLocationsList}
-            categories={categoriesList}
-            isLoading={isProductSaving} // Pass loading state to dialog
-          />
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{selectedProduct ? "Editar Produto" : "Novo Produto"}</DialogTitle>
+            </DialogHeader>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                handleSaveProduct()
+              }}
+              className="space-y-4"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium">Nome *</Label>
+                  <Input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Digite o nome do produto"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-sm font-medium">Categoria *</Label>
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value) => setFormData({ ...formData, category: value })}
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione uma categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categoriesList.map((category) => (
+                        <SelectItem key={category.id} value={category.name}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="text-sm font-medium">Preço *</Label>
+                  <Input
+                    type="text"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                    placeholder="R$ 0,00"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-sm font-medium">Local de Impressão</Label>
+                  <Select
+                    value={formData.print_location_id}
+                    onValueChange={(value) => setFormData({ ...formData, print_location_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Usar padrão da categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="category-default">Usar padrão da categoria</SelectItem>
+                      {printLocationsList.map((location) => (
+                        <SelectItem key={location.id} value={location.id}>
+                          {location.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500 mt-1">Se não selecionado, usará o local definido na categoria</p>
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium">Descrição</Label>
+                <Textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows={3}
+                  placeholder="Descrição opcional do produto"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={formData.active}
+                  onCheckedChange={(checked) => setFormData({ ...formData, active: checked })}
+                />
+                <Label className="text-sm font-medium">Produto ativo</Label>
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsDialogOpen(false)
+                    setSelectedProduct(null)
+                    setFormData({
+                      name: "",
+                      price: "",
+                      category: "",
+                      description: "",
+                      print_location_id: "",
+                      active: true,
+                    })
+                  }}
+                  className="flex-1 bg-transparent"
+                  disabled={isSaving}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" className="flex-1" disabled={isSaving}>
+                  {isSaving ? (
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Salvando...
+                    </div>
+                  ) : (
+                    "Salvar"
+                  )}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
         </Dialog>
       </div>
 
@@ -660,6 +857,14 @@ export function ProductsScreen() {
                             size="sm"
                             onClick={() => {
                               setSelectedProduct(product)
+                              setFormData({
+                                name: product.name,
+                                price: product.price.toString(),
+                                category: product.category,
+                                description: product.description || "",
+                                print_location_id: product.print_location_id || "",
+                                active: product.on_off,
+                              })
                               setIsDialogOpen(true)
                             }}
                           >
@@ -726,40 +931,299 @@ export function ProductsScreen() {
         </TabsContent>
 
         <TabsContent value="categories" className="space-y-4">
-          <CategoriesTab
-            categories={categoriesList}
-            printLocations={printLocationsList}
-            onReload={loadCategories}
-            isDialogOpen={isCategoryDialogOpen}
-            setIsDialogOpen={setIsCategoryDialogOpen}
-            selectedCategory={selectedCategory}
-            setSelectedCategory={setSelectedCategory}
-            onSave={handleSaveCategory}
-            pagination={categoriesPagination}
-            currentPage={categoriesPage}
-            setCurrentPage={setCategoriesPage}
-            searchTerm={categoriesSearch}
-            setSearchTerm={setCategoriesSearch}
-            isCategorySaving={isCategorySaving}
-          />
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Categorias</h2>
+              <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setSelectedCategory(null)
+                      setCategoryFormData({ name: "", print_location_id: "", active: true })
+                    }}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Nova Categoria
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{selectedCategory ? "Editar Categoria" : "Nova Categoria"}</DialogTitle>
+                  </DialogHeader>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      handleSaveCategory()
+                    }}
+                    className="space-y-4"
+                  >
+                    <div>
+                      <Label className="text-sm font-medium">Nome *</Label>
+                      <Input
+                        type="text"
+                        value={categoryFormData.name}
+                        onChange={(e) => setCategoryFormData({ ...categoryFormData, name: e.target.value })}
+                        placeholder="Nome da categoria"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Local de Impressão</Label>
+                      <Select
+                        value={categoryFormData.print_location_id}
+                        onValueChange={(value) =>
+                          setCategoryFormData({ ...categoryFormData, print_location_id: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um local" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {printLocationsList.map((location) => (
+                            <SelectItem key={location.id} value={location.id}>
+                              {location.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={categoryFormData.active}
+                        onCheckedChange={(checked) => setCategoryFormData({ ...categoryFormData, active: checked })}
+                      />
+                      <Label className="text-sm font-medium">Categoria ativa</Label>
+                    </div>
+                    <div className="flex gap-2 pt-4">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setIsCategoryDialogOpen(false)
+                          setSelectedCategory(null)
+                          setCategoryFormData({ name: "", print_location_id: "", active: true })
+                        }}
+                        className="flex-1 bg-transparent"
+                      >
+                        Cancelar
+                      </Button>
+                      <Button type="submit" className="flex-1" disabled={isCategorySaving}>
+                        {isCategorySaving ? (
+                          <div className="flex items-center gap-2">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            Salvando...
+                          </div>
+                        ) : (
+                          "Salvar"
+                        )}
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                placeholder="Buscar categorias..."
+                value={categoriesSearch}
+                onChange={(e) => setCategoriesSearch(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            <div className="bg-white rounded-lg border">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="border-b bg-gray-50">
+                    <tr>
+                      <th className="text-left p-4 font-semibold">Nome</th>
+                      <th className="text-left p-4 font-semibold">Local de Impressão</th>
+                      <th className="text-left p-4 font-semibold">Status</th>
+                      <th className="text-left p-4 font-semibold">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categoriesList.map((category) => (
+                      <tr key={category.id} className="border-b hover:bg-gray-50">
+                        <td className="p-4 font-medium">{category.name}</td>
+                        <td className="p-4">
+                          <Badge variant="secondary">
+                            {printLocationsList.find((pl) => pl.id === category.print_location_id)?.name ||
+                              "Não definido"}
+                          </Badge>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            <Switch checked={category.on_off} />
+                            <span className={category.on_off ? "text-green-600" : "text-gray-400"}>
+                              {category.on_off ? "Ativo" : "Inativo"}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm">
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-red-600 hover:text-red-700 bg-transparent"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {categoriesList.length === 0 && (
+                <div className="text-center py-12">
+                  <p className="text-gray-500">Nenhuma categoria encontrada</p>
+                </div>
+              )}
+            </div>
+
+            {categoriesPagination.totalPages > 1 && (
+              <div className="flex justify-center">
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious />
+                    </PaginationItem>
+                    <PaginationItem>
+                      <PaginationLink>1</PaginationLink>
+                    </PaginationItem>
+                    <PaginationItem>
+                      <PaginationNext />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
+          </div>
         </TabsContent>
 
         <TabsContent value="additionals" className="space-y-4">
-          <AdditionalsTab
-            additionals={additionalsList}
-            onReload={loadAdditionals}
-            isDialogOpen={isAdditionalDialogOpen}
-            setIsDialogOpen={setIsAdditionalDialogOpen}
-            selectedAdditional={selectedAdditional}
-            setSelectedAdditional={setSelectedAdditional}
-            onSave={handleSaveAdditional}
-            pagination={additionalsPagination}
-            currentPage={additionalsPage}
-            setCurrentPage={setAdditionalsPage}
-            searchTerm={additionalsSearch}
-            setSearchTerm={setAdditionalsSearch}
-            isAdditionalSaving={isAdditionalSaving}
-          />
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Adicionais</h2>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button size="sm">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Novo Adicional
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Novo Adicional</DialogTitle>
+                  </DialogHeader>
+                  <form className="space-y-4">
+                    <div>
+                      <Label className="text-sm font-medium">Nome *</Label>
+                      <Input type="text" placeholder="Nome do adicional" required />
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Preço *</Label>
+                      <Input type="text" placeholder="R$ 0,00" required />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch />
+                      <Label className="text-sm font-medium">Adicional ativo</Label>
+                    </div>
+                    <div className="flex gap-2 pt-4">
+                      <Button type="button" variant="outline" className="flex-1 bg-transparent">
+                        Cancelar
+                      </Button>
+                      <Button type="submit" className="flex-1" disabled={isAdditionalSaving}>
+                        {isAdditionalSaving ? (
+                          <div className="flex items-center gap-2">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            Salvando...
+                          </div>
+                        ) : (
+                          "Salvar"
+                        )}
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input placeholder="Buscar adicionais..." className="pl-10" />
+            </div>
+
+            <div className="bg-white rounded-lg border">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="border-b bg-gray-50">
+                    <tr>
+                      <th className="text-left p-4 font-semibold">Nome</th>
+                      <th className="text-left p-4 font-semibold">Preço</th>
+                      <th className="text-left p-4 font-semibold">Status</th>
+                      <th className="text-left p-4 font-semibold">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="p-4 font-medium">Adicional 1</td>
+                      <td className="p-4 font-medium">R$ 5,00</td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2">
+                          <Switch />
+                          <span className="text-green-600">Ativo</span>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" size="sm">
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700 bg-transparent"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="text-center py-12">
+                <p className="text-gray-500">Nenhum adicional encontrado</p>
+              </div>
+            </div>
+
+            <div className="flex justify-center">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationLink>1</PaginationLink>
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="print-locations" className="space-y-4">
@@ -780,592 +1244,6 @@ export function ProductsScreen() {
           />
         </TabsContent>
       </Tabs>
-    </div>
-  )
-}
-
-function ProductDialog({
-  product,
-  onSave,
-  onClose,
-  printLocations,
-  categories: categoriesList,
-  isLoading,
-}: {
-  product: Product | null
-  onSave: (data: Partial<Product>) => void
-  onClose: () => void
-  printLocations: PrintLocation[]
-  categories: Category[]
-  isLoading: boolean
-}) {
-  const [formData, setFormData] = useState({
-    name: "",
-    category: "",
-    price: 0,
-    description: "",
-    on_off: true,
-    complements: [],
-    print_location_id: "",
-  })
-
-  const [errors, setErrors] = useState<Record<string, string>>({})
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [priceDisplay, setPriceDisplay] = useState("")
-
-  useEffect(() => {
-    if (product) {
-      setFormData({
-        name: product.name || "",
-        category: product.category || "",
-        price: product.price || 0,
-        description: product.description || "",
-        on_off: product.on_off ?? true,
-        complements: product.complements || [],
-        print_location_id: product.print_location_id || "",
-      })
-      setPriceDisplay(formatCurrency(product.price || 0))
-    } else {
-      setFormData({
-        name: "",
-        category: "",
-        price: 0,
-        description: "",
-        on_off: true,
-        complements: [],
-        print_location_id: "",
-      })
-      setPriceDisplay("")
-    }
-    setErrors({})
-  }, [product])
-
-  const handlePriceChange = (value: string) => {
-    const cleaned = value.replace(/[^\d]/g, "")
-
-    if (cleaned.length === 0) {
-      setPriceDisplay("")
-      setFormData((prev) => ({ ...prev, price: 0 }))
-      return
-    }
-
-    const numValue = Number.parseInt(cleaned) / 100
-    setFormData((prev) => ({ ...prev, price: numValue }))
-
-    const formatted = new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(numValue)
-
-    setPriceDisplay(formatted)
-  }
-
-  const handleFieldChange = (field: string, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
-    if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: "" }))
-    }
-  }
-
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {}
-
-    if (!formData.name.trim()) {
-      newErrors.name = "Nome é obrigatório"
-    } else if (formData.name.trim().length < 2) {
-      newErrors.name = "Nome deve ter pelo menos 2 caracteres"
-    } else if (formData.name.trim().length > 100) {
-      newErrors.name = "Nome deve ter no máximo 100 caracteres"
-    }
-
-    if (!formData.category) {
-      newErrors.category = "Categoria é obrigatória"
-    }
-
-    if (!formData.price || formData.price <= 0) {
-      newErrors.price = "Preço deve ser maior que zero"
-    } else if (formData.price > 9999.99) {
-      newErrors.price = "Preço deve ser menor que R$ 9.999,99"
-    }
-
-    if (formData.description && formData.description.trim().length > 0 && formData.description.trim().length < 10) {
-      newErrors.description = "Descrição deve ter pelo menos 10 caracteres"
-    } else if (formData.description && formData.description.length > 500) {
-      newErrors.description = "Descrição deve ter no máximo 500 caracteres"
-    }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!validateForm()) {
-      // @ts-ignore
-      window.showToast?.({
-        type: "error",
-        title: "Erro de Validação",
-        description: "Por favor, corrija os erros no formulário",
-      })
-      return
-    }
-
-    setIsSubmitting(true)
-
-    try {
-      const sanitizedData = {
-        ...formData,
-        name: formData.name.trim(),
-        description: formData.description.trim(),
-        price: Number(formData.price.toFixed(2)),
-      }
-
-      await onSave(sanitizedData)
-    } catch (error) {
-      console.error("Erro ao salvar produto:", error)
-      // @ts-ignore
-      window.showToast?.({
-        type: "error",
-        title: "Erro",
-        description: "Erro ao salvar produto. Tente novamente.",
-      })
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  return (
-    <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-      <DialogHeader>
-        <DialogTitle>{product ? "Editar Produto" : "Novo Produto"}</DialogTitle>
-      </DialogHeader>
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="text-sm font-medium">Nome *</label>
-            <Input
-              value={formData.name}
-              onChange={(e) => handleFieldChange("name", e.target.value)}
-              className={errors.name ? "border-red-500" : ""}
-              placeholder="Digite o nome do produto"
-              maxLength={100}
-            />
-            {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
-          </div>
-
-          <div>
-            <label className="text-sm font-medium">Categoria *</label>
-            <Select value={formData.category} onValueChange={(value) => handleFieldChange("category", value)}>
-              <SelectTrigger className={errors.category ? "border-red-500" : ""}>
-                <SelectValue placeholder="Selecione uma categoria" />
-              </SelectTrigger>
-              <SelectContent>
-                {categoriesList.map((category) => (
-                  <SelectItem key={category.id} value={category.name}>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.category && <p className="text-red-500 text-xs mt-1">{errors.category}</p>}
-          </div>
-
-          <div>
-            <label className="text-sm font-medium">Preço *</label>
-            <Input
-              type="text"
-              value={priceDisplay}
-              onChange={(e) => handlePriceChange(e.target.value)}
-              className={errors.price ? "border-red-500" : ""}
-              placeholder="R$ 0,00"
-            />
-            {errors.price && <p className="text-red-500 text-xs mt-1">{errors.price}</p>}
-          </div>
-
-          <div>
-            <label className="text-sm font-medium">Local de Impressão</label>
-            <Select
-              value={formData.print_location_id}
-              onValueChange={(value) => handleFieldChange("print_location_id", value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Usar padrão da categoria" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="category-default">Usar padrão da categoria</SelectItem>
-                {printLocations.map((location) => (
-                  <SelectItem key={location.id} value={location.id}>
-                    {location.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-gray-500 mt-1">Se não selecionado, usará o local definido na categoria</p>
-          </div>
-        </div>
-
-        <div>
-          <label className="text-sm font-medium">Descrição</label>
-          <Textarea
-            value={formData.description}
-            onChange={(e) => handleFieldChange("description", e.target.value)}
-            className={errors.description ? "border-red-500" : ""}
-            rows={3}
-            placeholder="Descrição opcional do produto"
-            maxLength={500}
-          />
-          {errors.description && <p className="text-red-500 text-xs mt-1">{errors.description}</p>}
-          <p className="text-xs text-gray-500 mt-1">{formData.description.length}/500 caracteres</p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Switch checked={formData.on_off} onCheckedChange={(checked) => handleFieldChange("on_off", checked)} />
-          <label className="text-sm font-medium">Produto ativo</label>
-        </div>
-
-        <div className="flex gap-2 pt-4">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onClose}
-            className="flex-1 bg-transparent"
-            disabled={isSubmitting || isLoading}
-          >
-            Cancelar
-          </Button>
-          <Button type="submit" className="flex-1" disabled={isSubmitting || isLoading}>
-            {isSubmitting || isLoading ? (
-              <div className="flex items-center gap-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                Salvando...
-              </div>
-            ) : (
-              "Salvar"
-            )}
-          </Button>
-        </div>
-      </form>
-    </DialogContent>
-  )
-}
-
-function CategoriesTab({
-  categories,
-  printLocations,
-  onReload,
-  isDialogOpen,
-  setIsDialogOpen,
-  selectedCategory,
-  setSelectedCategory,
-  onSave,
-  pagination,
-  currentPage,
-  setCurrentPage,
-  searchTerm,
-  setSearchTerm,
-  isCategorySaving,
-}: {
-  categories: Category[]
-  printLocations: PrintLocation[]
-  onReload: () => void
-  isDialogOpen: boolean
-  setIsDialogOpen: (open: boolean) => void
-  selectedCategory: Category | null
-  setSelectedCategory: (category: Category | null) => void
-  onSave: (data: Partial<Category>) => void
-  pagination: { page: number; limit: number; total: number; totalPages: number }
-  currentPage: number
-  setCurrentPage: (page: number) => void
-  searchTerm: string
-  setSearchTerm: (term: string) => void
-  isCategorySaving: boolean
-}) {
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Categorias</h2>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" onClick={() => setSelectedCategory(null)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Nova Categoria
-            </Button>
-          </DialogTrigger>
-          <CategoryDialog
-            category={selectedCategory}
-            printLocations={printLocations}
-            onSave={onSave}
-            onClose={() => setIsDialogOpen(false)}
-            isLoading={isCategorySaving}
-          />
-        </Dialog>
-      </div>
-
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <Input
-          placeholder="Buscar categorias..."
-          value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value)
-            setCurrentPage(1)
-          }}
-          className="pl-10"
-        />
-      </div>
-
-      <div className="bg-white rounded-lg border">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="border-b bg-gray-50">
-              <tr>
-                <th className="text-left p-4 font-semibold">Nome</th>
-                <th className="text-left p-4 font-semibold">Local de Impressão</th>
-                <th className="text-left p-4 font-semibold">Status</th>
-                <th className="text-left p-4 font-semibold">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {categories.map((category) => (
-                <tr key={category.id} className="border-b hover:bg-gray-50">
-                  <td className="p-4 font-medium">
-                    {category.name || (category as any).nome || `Categoria ${category.id.slice(0, 8)}`}
-                  </td>
-                  <td className="p-4">
-                    <Badge variant="secondary">
-                      {printLocations.find((pl) => pl.id === category.print_location_id)?.name || "Não definido"}
-                    </Badge>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-2">
-                      <Switch checked={category.on_off} />
-                      <span className={category.on_off ? "text-green-600" : "text-gray-400"}>
-                        {category.on_off ? "Ativo" : "Inativo"}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedCategory(category)
-                          setIsDialogOpen(true)
-                        }}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 bg-transparent">
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {categories.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-500">Nenhuma categoria encontrada</p>
-          </div>
-        )}
-      </div>
-
-      {pagination.totalPages > 1 && (
-        <div className="flex justify-center">
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                />
-              </PaginationItem>
-
-              {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((page) => (
-                <PaginationItem key={page}>
-                  <PaginationLink
-                    onClick={() => setCurrentPage(page)}
-                    isActive={currentPage === page}
-                    className="cursor-pointer"
-                  >
-                    {page}
-                  </PaginationLink>
-                </PaginationItem>
-              ))}
-
-              <PaginationItem>
-                <PaginationNext
-                  onClick={() => setCurrentPage(Math.min(pagination.totalPages, currentPage + 1))}
-                  className={
-                    currentPage === pagination.totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"
-                  }
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function AdditionalsTab({
-  additionals,
-  onReload,
-  isDialogOpen,
-  setIsDialogOpen,
-  selectedAdditional,
-  setSelectedAdditional,
-  onSave,
-  pagination,
-  currentPage,
-  setCurrentPage,
-  searchTerm,
-  setSearchTerm,
-  isAdditionalSaving,
-}: {
-  additionals: Additional[]
-  onReload: () => void
-  isDialogOpen: boolean
-  setIsDialogOpen: (open: boolean) => void
-  selectedAdditional: Additional | null
-  setSelectedAdditional: (additional: Additional | null) => void
-  onSave: (data: Partial<Additional>) => void
-  pagination: { page: number; limit: number; total: number; totalPages: number }
-  currentPage: number
-  setCurrentPage: (page: number) => void
-  searchTerm: string
-  setSearchTerm: (term: string) => void
-  isAdditionalSaving: boolean
-}) {
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Adicionais</h2>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" onClick={() => setSelectedAdditional(null)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Novo Adicional
-            </Button>
-          </DialogTrigger>
-          <AdditionalDialog
-            additional={selectedAdditional}
-            onSave={onSave}
-            onClose={() => setIsDialogOpen(false)}
-            isLoading={isAdditionalSaving}
-          />
-        </Dialog>
-      </div>
-
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <Input
-          placeholder="Buscar adicionais..."
-          value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value)
-            setCurrentPage(1)
-          }}
-          className="pl-10"
-        />
-      </div>
-
-      <div className="bg-white rounded-lg border">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="border-b bg-gray-50">
-              <tr>
-                <th className="text-left p-4 font-semibold">Nome</th>
-                <th className="text-left p-4 font-semibold">Preço</th>
-                <th className="text-left p-4 font-semibold">Status</th>
-                <th className="text-left p-4 font-semibold">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {additionals.map((additional) => (
-                <tr key={additional.id} className="border-b hover:bg-gray-50">
-                  <td className="p-4 font-medium">{additional.name}</td>
-                  <td className="p-4 font-medium">{formatCurrency(additional.price)}</td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-2">
-                      <Switch checked={additional.on_off} />
-                      <span className={additional.on_off ? "text-green-600" : "text-gray-400"}>
-                        {additional.on_off ? "Ativo" : "Inativo"}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedAdditional(additional)
-                          setIsDialogOpen(true)
-                        }}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 bg-transparent">
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {additionals.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-500">Nenhum adicional encontrado</p>
-          </div>
-        )}
-      </div>
-
-      {pagination.totalPages > 1 && (
-        <div className="flex justify-center">
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                />
-              </PaginationItem>
-
-              {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((page) => (
-                <PaginationItem key={page}>
-                  <PaginationLink
-                    onClick={() => setCurrentPage(page)}
-                    isActive={currentPage === page}
-                    className="cursor-pointer"
-                  >
-                    {page}
-                  </PaginationLink>
-                </PaginationItem>
-              ))}
-
-              <PaginationItem>
-                <PaginationNext
-                  onClick={() => setCurrentPage(Math.min(pagination.totalPages, currentPage + 1))}
-                  className={
-                    currentPage === pagination.totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"
-                  }
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
-      )}
     </div>
   )
 }
@@ -1424,10 +1302,7 @@ function PrintLocationsTab({
         <Input
           placeholder="Buscar locais de impressão..."
           value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value)
-            setCurrentPage(1)
-          }}
+          onChange={(e) => setSearchTerm(e.target.value)}
           className="pl-10"
         />
       </div>
@@ -1456,14 +1331,7 @@ function PrintLocationsTab({
                   </td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedPrintLocation(location)
-                          setIsDialogOpen(true)
-                        }}
-                      >
+                      <Button variant="outline" size="sm">
                         <Edit className="w-4 h-4" />
                       </Button>
                       <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 bg-transparent">
@@ -1489,244 +1357,19 @@ function PrintLocationsTab({
           <Pagination>
             <PaginationContent>
               <PaginationItem>
-                <PaginationPrevious
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                />
+                <PaginationPrevious />
               </PaginationItem>
-
-              {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((page) => (
-                <PaginationItem key={page}>
-                  <PaginationLink
-                    onClick={() => setCurrentPage(page)}
-                    isActive={currentPage === page}
-                    className="cursor-pointer"
-                  >
-                    {page}
-                  </PaginationLink>
-                </PaginationItem>
-              ))}
-
               <PaginationItem>
-                <PaginationNext
-                  onClick={() => setCurrentPage(Math.min(pagination.totalPages, currentPage + 1))}
-                  className={
-                    currentPage === pagination.totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"
-                  }
-                />
+                <PaginationLink>1</PaginationLink>
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationNext />
               </PaginationItem>
             </PaginationContent>
           </Pagination>
         </div>
       )}
     </div>
-  )
-}
-
-function CategoryDialog({
-  category,
-  printLocations,
-  onSave,
-  onClose,
-  isLoading,
-}: {
-  category: Category | null
-  printLocations: PrintLocation[]
-  onSave: (data: Partial<Category>) => void
-  onClose: () => void
-  isLoading: boolean
-}) {
-  const [formData, setFormData] = useState({
-    name: "",
-    on_off: true,
-    print_location_id: "",
-  })
-
-  useEffect(() => {
-    if (category) {
-      setFormData({
-        name: category.name || "",
-        on_off: category.on_off ?? true,
-        print_location_id: category.print_location_id || "",
-      })
-    } else {
-      setFormData({
-        name: "",
-        on_off: true,
-        print_location_id: "",
-      })
-    }
-  }, [category])
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!formData.name.trim() || isLoading) return // Prevent submission if saving
-    onSave(formData)
-  }
-
-  return (
-    <DialogContent>
-      <DialogHeader>
-        <DialogTitle>{category ? "Editar Categoria" : "Nova Categoria"}</DialogTitle>
-      </DialogHeader>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="text-sm font-medium">Nome *</label>
-          <Input
-            value={formData.name}
-            onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-            placeholder="Nome da categoria"
-            required
-          />
-        </div>
-        <div>
-          <label className="text-sm font-medium">Local de Impressão</label>
-          <Select
-            value={formData.print_location_id}
-            onValueChange={(value) => setFormData((prev) => ({ ...prev, print_location_id: value }))}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione um local" />
-            </SelectTrigger>
-            <SelectContent>
-              {printLocations.map((location) => (
-                <SelectItem key={location.id} value={location.id}>
-                  {location.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex items-center gap-2">
-          <Switch
-            checked={formData.on_off}
-            onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, on_off: checked }))}
-          />
-          <label className="text-sm font-medium">Categoria ativa</label>
-        </div>
-        <div className="flex gap-2 pt-4">
-          <Button type="button" variant="outline" onClick={onClose} className="flex-1 bg-transparent">
-            Cancelar
-          </Button>
-          <Button type="submit" className="flex-1" disabled={isLoading}>
-            {isLoading ? (
-              <div className="flex items-center gap-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                Salvando...
-              </div>
-            ) : (
-              "Salvar"
-            )}
-          </Button>
-        </div>
-      </form>
-    </DialogContent>
-  )
-}
-
-function AdditionalDialog({
-  additional,
-  onSave,
-  onClose,
-  isLoading,
-}: {
-  additional: Additional | null
-  onSave: (data: Partial<Additional>) => void
-  onClose: () => void
-  isLoading: boolean
-}) {
-  const [formData, setFormData] = useState({
-    name: "",
-    price: 0,
-    on_off: true,
-  })
-  const [priceDisplay, setPriceDisplay] = useState("")
-
-  useEffect(() => {
-    if (additional) {
-      setFormData({
-        name: additional.name || "",
-        price: additional.price || 0,
-        on_off: additional.on_off ?? true,
-      })
-      setPriceDisplay(formatCurrency(additional.price || 0))
-    } else {
-      setFormData({
-        name: "",
-        price: 0,
-        on_off: true,
-      })
-      setPriceDisplay("")
-    }
-  }, [additional])
-
-  const handlePriceChange = (value: string) => {
-    const cleaned = value.replace(/[^\d]/g, "")
-    if (cleaned.length === 0) {
-      setPriceDisplay("")
-      setFormData((prev) => ({ ...prev, price: 0 }))
-      return
-    }
-    const numValue = Number.parseInt(cleaned) / 100
-    setFormData((prev) => ({ ...prev, price: numValue }))
-    setPriceDisplay(formatCurrency(numValue))
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!formData.name.trim() || isLoading) return // Prevent submission if saving
-    onSave(formData)
-  }
-
-  return (
-    <DialogContent>
-      <DialogHeader>
-        <DialogTitle>{additional ? "Editar Adicional" : "Novo Adicional"}</DialogTitle>
-      </DialogHeader>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="text-sm font-medium">Nome *</label>
-          <Input
-            value={formData.name}
-            onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-            placeholder="Nome do adicional"
-            required
-          />
-        </div>
-        <div>
-          <label className="text-sm font-medium">Preço *</label>
-          <Input
-            type="text"
-            value={priceDisplay}
-            onChange={(e) => handlePriceChange(e.target.value)}
-            placeholder="R$ 0,00"
-            required
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <Switch
-            checked={formData.on_off}
-            onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, on_off: checked }))}
-          />
-          <label className="text-sm font-medium">Adicional ativo</label>
-        </div>
-        <div className="flex gap-2 pt-4">
-          <Button type="button" variant="outline" onClick={onClose} className="flex-1 bg-transparent">
-            Cancelar
-          </Button>
-          <Button type="submit" className="flex-1" disabled={isLoading}>
-            {isLoading ? (
-              <div className="flex items-center gap-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                Salvando...
-              </div>
-            ) : (
-              "Salvar"
-            )}
-          </Button>
-        </div>
-      </form>
-    </DialogContent>
   )
 }
 
