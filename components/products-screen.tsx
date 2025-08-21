@@ -32,6 +32,8 @@ import {
   PaginationNext,
 } from "@/components/ui/pagination"
 
+import { AuditLogger } from "@/lib/audit-logger"
+
 interface Product {
   id: string
   name: string
@@ -150,20 +152,41 @@ export function ProductsScreen() {
       const method = selectedProduct ? "PUT" : "POST"
       const url = selectedProduct ? `/api/products/${selectedProduct.id}` : "/api/products"
 
+      const oldValues = selectedProduct ? { ...selectedProduct } : null
+
       const response = await fetch(url, {
         method,
         headers: {
           "Content-Type": "application/json",
+          "x-user-email": "tarcisiorp16@gmail.com",
         },
         body: JSON.stringify(data),
       })
 
       if (response.ok) {
+        const result = await response.json()
+
+        try {
+          await AuditLogger.logUserAction(
+            "6c296af6-641b-4789-aec2-b5d18fc81585", // user_id
+            "96d5dd15-e5e7-4592-b18c-0a588b8d3e30", // company_id
+            selectedProduct ? "UPDATE" : "CREATE",
+            "products",
+            result.id || selectedProduct?.id,
+            oldValues,
+            data,
+          )
+        } catch (auditError) {
+          console.error("Audit logging failed:", auditError)
+        }
+
         // @ts-ignore
         window.showToast?.({
           type: "success",
           title: "Sucesso",
           description: selectedProduct ? "Produto atualizado com sucesso" : "Produto criado com sucesso",
+          duration: 3000,
+          className: "animate-in slide-in-from-right-full",
         })
         setIsDialogOpen(false)
         loadProducts() // Recarregar lista
@@ -177,6 +200,8 @@ export function ProductsScreen() {
         type: "error",
         title: "Erro",
         description: "Erro ao salvar produto. Tente novamente.",
+        duration: 4000,
+        className: "animate-in slide-in-from-right-full",
       })
     } finally {
       setIsProductSaving(false) // Re-enable button after operation
@@ -188,23 +213,40 @@ export function ProductsScreen() {
       const product = products.find((p) => p.id === productId)
       if (!product) return
 
+      const oldValues = { ...product }
+      const newValues = { ...product, on_off: !product.on_off }
+
       const response = await fetch(`/api/products/${productId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
+          "x-user-email": "tarcisiorp16@gmail.com",
         },
-        body: JSON.stringify({
-          ...product,
-          on_off: !product.on_off,
-        }),
+        body: JSON.stringify(newValues),
       })
 
       if (response.ok) {
+        try {
+          await AuditLogger.logUserAction(
+            "6c296af6-641b-4789-aec2-b5d18fc81585", // user_id
+            "96d5dd15-e5e7-4592-b18c-0a588b8d3e30", // company_id
+            "UPDATE",
+            "products",
+            productId,
+            oldValues,
+            newValues,
+          )
+        } catch (auditError) {
+          console.error("Audit logging failed:", auditError)
+        }
+
         // @ts-ignore
         window.showToast?.({
           type: "success",
           title: "Sucesso",
           description: `Produto ${!product.on_off ? "ativado" : "desativado"} com sucesso`,
+          duration: 3000,
+          className: "animate-in slide-in-from-right-full",
         })
         loadProducts() // Recarregar lista
       } else {
@@ -217,6 +259,8 @@ export function ProductsScreen() {
         type: "error",
         title: "Erro",
         description: "Erro ao alterar status do produto",
+        duration: 4000,
+        className: "animate-in slide-in-from-right-full",
       })
     }
   }
@@ -226,6 +270,9 @@ export function ProductsScreen() {
 
     setIsDeleting(true)
     try {
+      const product = products.find((p) => p.id === productId)
+      const oldValues = product ? { ...product } : null
+
       const response = await fetch(`/api/products?id=${productId}`, {
         method: "DELETE",
         headers: {
@@ -234,6 +281,20 @@ export function ProductsScreen() {
       })
 
       if (response.ok) {
+        try {
+          await AuditLogger.logUserAction(
+            "6c296af6-641b-4789-aec2-b5d18fc81585", // user_id
+            "96d5dd15-e5e7-4592-b18c-0a588b8d3e30", // company_id
+            "DELETE",
+            "products",
+            productId,
+            oldValues,
+            null,
+          )
+        } catch (auditError) {
+          console.error("Audit logging failed:", auditError)
+        }
+
         // @ts-ignore
         window.showToast?.({
           type: "success",
@@ -368,6 +429,8 @@ export function ProductsScreen() {
       const method = selectedCategory ? "PUT" : "POST"
       const url = selectedCategory ? `/api/categories/${selectedCategory.id}` : "/api/categories"
 
+      const oldValues = selectedCategory ? { ...selectedCategory } : null
+
       const response = await fetch(url, {
         method,
         headers: {
@@ -378,11 +441,29 @@ export function ProductsScreen() {
       })
 
       if (response.ok) {
+        const result = await response.json()
+
+        try {
+          await AuditLogger.logUserAction(
+            "6c296af6-641b-4789-aec2-b5d18fc81585", // user_id
+            "96d5dd15-e5e7-4592-b18c-0a588b8d3e30", // company_id
+            selectedCategory ? "UPDATE" : "CREATE",
+            "categories",
+            result.id || selectedCategory?.id,
+            oldValues,
+            data,
+          )
+        } catch (auditError) {
+          console.error("Audit logging failed:", auditError)
+        }
+
         // @ts-ignore
         window.showToast?.({
           type: "success",
           title: "Sucesso",
           description: selectedCategory ? "Categoria atualizada com sucesso" : "Categoria criada com sucesso",
+          duration: 3000,
+          className: "animate-in slide-in-from-right-full",
         })
         setIsCategoryDialogOpen(false)
         loadCategories()
@@ -396,6 +477,8 @@ export function ProductsScreen() {
         type: "error",
         title: "Erro",
         description: "Erro ao salvar categoria. Tente novamente.",
+        duration: 4000,
+        className: "animate-in slide-in-from-right-full",
       })
     } finally {
       setIsCategorySaving(false) // Re-enable button after operation
@@ -410,6 +493,8 @@ export function ProductsScreen() {
       const method = selectedAdditional ? "PUT" : "POST"
       const url = selectedAdditional ? `/api/additionals/${selectedAdditional.id}` : "/api/additionals"
 
+      const oldValues = selectedAdditional ? { ...selectedAdditional } : null
+
       const response = await fetch(url, {
         method,
         headers: {
@@ -420,11 +505,29 @@ export function ProductsScreen() {
       })
 
       if (response.ok) {
+        const result = await response.json()
+
+        try {
+          await AuditLogger.logUserAction(
+            "6c296af6-641b-4789-aec2-b5d18fc81585", // user_id
+            "96d5dd15-e5e7-4592-b18c-0a588b8d3e30", // company_id
+            selectedAdditional ? "UPDATE" : "CREATE",
+            "additionals",
+            result.id || selectedAdditional?.id,
+            oldValues,
+            data,
+          )
+        } catch (auditError) {
+          console.error("Audit logging failed:", auditError)
+        }
+
         // @ts-ignore
         window.showToast?.({
           type: "success",
           title: "Sucesso",
           description: selectedAdditional ? "Adicional atualizado com sucesso" : "Adicional criado com sucesso",
+          duration: 3000,
+          className: "animate-in slide-in-from-right-full",
         })
         setIsAdditionalDialogOpen(false)
         loadAdditionals()
@@ -438,6 +541,8 @@ export function ProductsScreen() {
         type: "error",
         title: "Erro",
         description: "Erro ao salvar adicional. Tente novamente.",
+        duration: 4000,
+        className: "animate-in slide-in-from-right-full",
       })
     } finally {
       setIsAdditionalSaving(false) // Re-enable button after operation
