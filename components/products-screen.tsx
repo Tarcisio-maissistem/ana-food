@@ -150,9 +150,11 @@ export function ProductsScreen() {
 
     try {
       const method = selectedProduct ? "PUT" : "POST"
-      const url = selectedProduct ? `/api/products/${selectedProduct.id}` : "/api/products"
+      const url = "/api/products"
 
       const oldValues = selectedProduct ? { ...selectedProduct } : null
+
+      const requestBody = selectedProduct ? { ...data, id: selectedProduct.id } : data
 
       const response = await fetch(url, {
         method,
@@ -160,7 +162,7 @@ export function ProductsScreen() {
           "Content-Type": "application/json",
           "x-user-email": "tarcisiorp16@gmail.com",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(requestBody),
       })
 
       if (response.ok) {
