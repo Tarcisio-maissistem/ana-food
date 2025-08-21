@@ -1,6 +1,17 @@
 import { createClient } from "@supabase/supabase-js"
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+// Validate environment variables
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error("[v0] Missing Supabase environment variables:", {
+    url: !!supabaseUrl,
+    key: !!supabaseKey,
+  })
+}
+
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null
 
 export interface AuditLogData {
   userId: string
@@ -19,6 +30,11 @@ export interface AuditLogData {
 export class AuditLogger {
   static async log(data: AuditLogData) {
     try {
+      if (!supabase) {
+        console.warn("[v0] Supabase client not available, skipping audit log")
+        return
+      }
+
       console.log("[v0] Audit Log:", data.actionType, data.tableName, data.recordId)
 
       const { error } = await supabase.from("audit_logs").insert({
