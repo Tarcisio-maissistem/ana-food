@@ -37,11 +37,20 @@ export class AuditLogger {
 
       console.log("[v0] Audit Log:", data.actionType, data.tableName, data.recordId)
 
-      const { error } = await supabase.from("audit_logs").insert({
+      let recordIdValue = data.recordId
+
+      // Check if recordId is a UUID format but column expects bigint
+      if (data.recordId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.recordId)) {
+        // If it's a UUID format, try to insert it as-is first
+        // If that fails, we'll handle it in the catch block
+        recordIdValue = data.recordId
+      }
+
+      const auditData = {
         user_id: data.userId,
         company_id: data.companyId,
         table_name: data.tableName,
-        record_id: data.recordId,
+        record_id: recordIdValue,
         action_type: data.actionType,
         old_values: data.oldValues,
         new_values: data.newValues,
@@ -50,10 +59,24 @@ export class AuditLogger {
         session_id: data.sessionId,
         request_url: data.requestUrl,
         created_at: new Date().toISOString(),
-      })
+      }
+
+      const { error } = await supabase.from("audit_logs").insert(auditData)
 
       if (error) {
-        console.error("[v0] Audit Log Error:", error)
+        if (error.message?.includes("invalid input syntax for type bigint") && data.recordId) {
+          console.warn("[v0] Audit Log: record_id column expects bigint, retrying without record_id")
+          const { error: retryError } = await supabase.from("audit_logs").insert({
+            ...auditData,
+            record_id: null, // Skip record_id to avoid type mismatch
+          })
+
+          if (retryError) {
+            console.error("[v0] Audit Log Retry Error:", retryError)
+          }
+        } else {
+          console.error("[v0] Audit Log Error:", error)
+        }
         // Don't throw error to avoid breaking main operations
       }
     } catch (error) {
