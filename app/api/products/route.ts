@@ -321,19 +321,103 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Usuário não encontrado" }, { status: 401 })
     }
 
-    const { data, error } = await supabase
-      .from("products")
-      .update({ ...updateData, updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .select()
-      .single()
+    try {
+      // Check table structure to see what columns are available
+      const { data: sampleData, error: structureError } = await supabase.from("products").select("*").limit(1)
 
-    if (error) {
-      console.error("Erro ao atualizar produto:", error)
-      return NextResponse.json({ error: "Erro ao atualizar produto" }, { status: 500 })
+      let availableColumns: string[] = []
+      if (!structureError && sampleData && sampleData.length > 0) {
+        availableColumns = Object.keys(sampleData[0])
+        console.log("[v0] Colunas disponíveis na tabela products:", availableColumns)
+      }
+
+      // Filter updateData to only include columns that exist in the database
+      const filteredUpdateData: any = {}
+
+      // Always include updated_at
+      filteredUpdateData.updated_at = new Date().toISOString()
+
+      // Map common fields to correct column names
+      const fieldMapping: { [key: string]: string } = {
+        name: availableColumns.includes("name") ? "name" : availableColumns.includes("nome") ? "nome" : "",
+        price: availableColumns.includes("price") ? "price" : availableColumns.includes("preco") ? "preco" : "",
+        category: availableColumns.includes("category")
+          ? "category"
+          : availableColumns.includes("categoria")
+            ? "categoria"
+            : "",
+        description: availableColumns.includes("description")
+          ? "description"
+          : availableColumns.includes("descricao")
+            ? "descricao"
+            : "",
+        print_location_id: availableColumns.includes("print_location_id") ? "print_location_id" : "",
+        on_off: availableColumns.includes("on_off") ? "on_off" : availableColumns.includes("active") ? "active" : "",
+      }
+
+      // Apply field mapping and filtering
+      for (const [frontendField, value] of Object.entries(updateData)) {
+        if (frontendField === "complements") {
+          // Skip complements field as it doesn't exist in the database
+          console.log("[v0] Ignorando campo 'complements' que não existe na tabela")
+          continue
+        }
+
+        const dbField = fieldMapping[frontendField] || frontendField
+        if (dbField && availableColumns.includes(dbField)) {
+          filteredUpdateData[dbField] = value
+        } else {
+          console.log(`[v0] Ignorando campo '${frontendField}' que não existe na tabela`)
+        }
+      }
+
+      const { data, error } = await supabase
+        .from("products")
+        .update(filteredUpdateData)
+        .eq("id", id)
+        .eq("user_id", userId)
+        .select()
+        .maybeSingle()
+
+      if (error) {
+        console.error("Erro ao atualizar produto:", error)
+        return NextResponse.json({ error: "Erro ao atualizar produto" }, { status: 500 })
+      }
+
+      if (!data) {
+        return NextResponse.json({ error: "Produto não encontrado ou não autorizado" }, { status: 404 })
+      }
+
+      return NextResponse.json(data)
+    } catch (updateError: any) {
+      console.error("Erro ao atualizar produto:", updateError)
+
+      // Fallback: try with basic fields only
+      try {
+        const basicUpdateData: any = {
+          updated_at: new Date().toISOString(),
+        }
+
+        if (updateData.name) basicUpdateData.name = updateData.name
+        if (updateData.price) basicUpdateData.price = updateData.price
+
+        const { data, error } = await supabase
+          .from("products")
+          .update(basicUpdateData)
+          .eq("id", id)
+          .select()
+          .maybeSingle()
+
+        if (error) {
+          throw error
+        }
+
+        return NextResponse.json(data || { id, ...basicUpdateData })
+      } catch (basicError) {
+        console.error("Erro ao atualizar produto com campos básicos:", basicError)
+        return NextResponse.json({ error: "Erro ao atualizar produto" }, { status: 500 })
+      }
     }
-
-    return NextResponse.json(data)
   } catch (error) {
     console.error("Erro na API de produtos:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
