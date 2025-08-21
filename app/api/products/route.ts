@@ -358,20 +358,44 @@ export async function DELETE(request: NextRequest) {
     }
 
     try {
-      // Excluir registros da tabela products_availability que referenciam este produto
-      await supabase.from("products_availability").delete().eq("produto_id", id)
+      // Try deleting from produtos_disponibilidade table (Portuguese name)
+      await supabase.from("produtos_disponibilidade").delete().eq("produto_id", id)
+      console.log("[v0] Registros dependentes excluídos da tabela produtos_disponibilidade")
+    } catch (dependencyError) {
+      console.log("[v0] Tabela produtos_disponibilidade não existe ou não há registros dependentes")
+    }
 
+    try {
+      // Try deleting from products_availability table (English name)
+      await supabase.from("products_availability").delete().eq("produto_id", id)
       console.log("[v0] Registros dependentes excluídos da tabela products_availability")
     } catch (dependencyError) {
-      console.log("[v0] Tabela products_availability não existe ou não há registros dependentes:", dependencyError)
-      // Continua com a exclusão do produto mesmo se não houver dependências
+      console.log("[v0] Tabela products_availability não existe ou não há registros dependentes")
     }
+
+    try {
+      // Try with different column name variations
+      await supabase.from("products_availability").delete().eq("product_id", id)
+      console.log("[v0] Registros dependentes excluídos da tabela products_availability (product_id)")
+    } catch (dependencyError) {
+      console.log("[v0] Coluna product_id não existe na tabela products_availability")
+    }
+
+    try {
+      // Try with produtos_disponibilidade and product_id
+      await supabase.from("produtos_disponibilidade").delete().eq("product_id", id)
+      console.log("[v0] Registros dependentes excluídos da tabela produtos_disponibilidade (product_id)")
+    } catch (dependencyError) {
+      console.log("[v0] Coluna product_id não existe na tabela produtos_disponibilidade")
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 100))
 
     const { error } = await supabase.from("products").delete().eq("id", id).eq("user_id", userId)
 
     if (error) {
       console.error("Erro ao excluir produto:", error)
-      return NextResponse.json({ error: "Erro ao excluir produto" }, { status: 500 })
+      return NextResponse.json({ error: `Erro ao excluir produto: ${error.message}` }, { status: 500 })
     }
 
     console.log("[v0] Produto excluído com sucesso:", id)
