@@ -19,6 +19,27 @@ async function getUserByEmail(email: string) {
   }
 }
 
+async function checkTableStructure() {
+  try {
+    // Try to get one row to understand the table structure
+    const { data, error } = await supabase.from("whatsapp_alerts").select("*").limit(1)
+
+    if (error) {
+      console.log("[v0] WhatsApp Alerts: Erro ao verificar estrutura da tabela:", error.message)
+      return { exists: false, columns: [] }
+    }
+
+    // Get column names from the first row (if any)
+    const columns = data && data.length > 0 ? Object.keys(data[0]) : []
+    console.log("[v0] WhatsApp Alerts: Tabela existe com colunas:", columns)
+
+    return { exists: true, columns }
+  } catch (error) {
+    console.log("[v0] WhatsApp Alerts: Tabela não existe ou erro de acesso:", error)
+    return { exists: false, columns: [] }
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const userEmail = request.headers.get("x-user-email") || "tarcisiorp16@gmail.com"
@@ -29,26 +50,43 @@ export async function GET(request: NextRequest) {
       return NextResponse.json([])
     }
 
-    const { data: alerts, error } = await supabase
-      .from("whatsapp_alerts")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("is_read", false)
-      .order("created_at", { ascending: false })
-      .limit(10)
+    const tableInfo = await checkTableStructure()
 
-    if (error) {
-      if (error.message.includes("does not exist") || error.message.includes("relation")) {
-        console.log("[v0] Tabela whatsapp_alerts não existe, retornando array vazio")
-        return NextResponse.json([])
-      }
-      console.error("Erro ao buscar alertas:", error)
+    if (!tableInfo.exists) {
+      console.log("[v0] Tabela whatsapp_alerts não existe, retornando array vazio")
       return NextResponse.json([])
     }
 
+    let query = supabase.from("whatsapp_alerts").select("*")
+
+    // Only filter by user_id if the column exists
+    if (tableInfo.columns.includes("user_id")) {
+      query = query.eq("user_id", userId)
+    }
+
+    // Only filter by is_read if the column exists
+    if (tableInfo.columns.includes("is_read")) {
+      query = query.eq("is_read", false)
+    }
+
+    // Order by created_at if available, otherwise by id
+    if (tableInfo.columns.includes("created_at")) {
+      query = query.order("created_at", { ascending: false })
+    } else if (tableInfo.columns.includes("id")) {
+      query = query.order("id", { ascending: false })
+    }
+
+    const { data: alerts, error } = await query.limit(10)
+
+    if (error) {
+      console.error("[v0] WhatsApp Alerts: Erro ao buscar alertas:", error.message)
+      return NextResponse.json([])
+    }
+
+    console.log("[v0] WhatsApp Alerts: Encontrados", alerts?.length || 0, "alertas")
     return NextResponse.json(alerts || [])
   } catch (error) {
-    console.error("Erro na API de alertas:", error)
+    console.error("[v0] WhatsApp Alerts: Erro na API:", error)
     return NextResponse.json([])
   }
 }
