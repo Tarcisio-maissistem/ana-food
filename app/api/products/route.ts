@@ -337,6 +337,16 @@ export async function PUT(request: NextRequest) {
       // Always include updated_at
       filteredUpdateData.updated_at = new Date().toISOString()
 
+      const uuidFields = ["print_location_id", "company_id", "user_id", "category_id"]
+
+      // Helper function to validate UUID fields
+      const validateUuidField = (value: any): any => {
+        if (value === "" || value === undefined) {
+          return null
+        }
+        return value
+      }
+
       // Map common fields to correct column names
       const fieldMapping: { [key: string]: string } = {
         name: availableColumns.includes("name") ? "name" : availableColumns.includes("nome") ? "nome" : "",
@@ -365,7 +375,12 @@ export async function PUT(request: NextRequest) {
 
         const dbField = fieldMapping[frontendField] || frontendField
         if (dbField && availableColumns.includes(dbField)) {
-          filteredUpdateData[dbField] = value
+          if (uuidFields.includes(dbField)) {
+            filteredUpdateData[dbField] = validateUuidField(value)
+            console.log(`[v0] Campo UUID '${dbField}' validado:`, filteredUpdateData[dbField])
+          } else {
+            filteredUpdateData[dbField] = value
+          }
         } else {
           console.log(`[v0] Ignorando campo '${frontendField}' que não existe na tabela`)
         }
