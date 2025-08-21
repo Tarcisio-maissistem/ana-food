@@ -57,6 +57,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json([])
     }
 
+    const { searchParams } = new URL(request.url)
+    const page = Number.parseInt(searchParams.get("page") || "1")
+    const limit = Number.parseInt(searchParams.get("limit") || "10")
+    const offset = (page - 1) * limit
+
     const tableExists = await checkTableExists(supabase)
 
     if (!tableExists) {
@@ -83,15 +88,31 @@ export async function GET(request: NextRequest) {
           updated_at: new Date().toISOString(),
         },
       ]
-      return NextResponse.json(userSpecificProducts)
+
+      const paginatedMockData = userSpecificProducts.slice(offset, offset + limit)
+      return NextResponse.json({
+        data: paginatedMockData,
+        pagination: {
+          page,
+          limit,
+          total: userSpecificProducts.length,
+          totalPages: Math.ceil(userSpecificProducts.length / limit),
+        },
+      })
     }
 
     try {
+      const { count } = await supabase
+        .from("products")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", userId)
+
       const { data: products, error } = await supabase
         .from("products")
         .select("*")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
+        .range(offset, offset + limit - 1) // Aplicando paginação
 
       if (error) {
         // Se o erro for sobre coluna user_id não existir, retornar dados mock específicos do usuário
@@ -119,14 +140,35 @@ export async function GET(request: NextRequest) {
               updated_at: new Date().toISOString(),
             },
           ]
-          return NextResponse.json(userSpecificProducts)
+
+          const paginatedMockData = userSpecificProducts.slice(offset, offset + limit)
+          return NextResponse.json({
+            data: paginatedMockData,
+            pagination: {
+              page,
+              limit,
+              total: userSpecificProducts.length,
+              totalPages: Math.ceil(userSpecificProducts.length / limit),
+            },
+          })
         }
 
         console.error("Erro ao buscar produtos:", error)
-        return NextResponse.json([])
+        return NextResponse.json({
+          data: [],
+          pagination: { page, limit, total: 0, totalPages: 0 },
+        })
       }
 
-      return NextResponse.json(products || [])
+      return NextResponse.json({
+        data: products || [],
+        pagination: {
+          page,
+          limit,
+          total: count || 0,
+          totalPages: Math.ceil((count || 0) / limit),
+        },
+      })
     } catch (queryError) {
       console.error("Erro na consulta de produtos:", queryError)
       // Fallback para dados mock específicos do usuário
@@ -152,11 +194,24 @@ export async function GET(request: NextRequest) {
           updated_at: new Date().toISOString(),
         },
       ]
-      return NextResponse.json(userSpecificProducts)
+
+      const paginatedMockData = userSpecificProducts.slice(offset, offset + limit)
+      return NextResponse.json({
+        data: paginatedMockData,
+        pagination: {
+          page,
+          limit,
+          total: userSpecificProducts.length,
+          totalPages: Math.ceil(userSpecificProducts.length / limit),
+        },
+      })
     }
   } catch (error) {
     console.error("Erro na API de produtos:", error)
-    return NextResponse.json([])
+    return NextResponse.json({
+      data: [],
+      pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
+    })
   }
 }
 
@@ -302,6 +357,16 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Usuário não encontrado" }, { status: 401 })
     }
 
+    try {
+      // Excluir registros da tabela products_availability que referenciam este produto
+      await supabase.from("products_availability").delete().eq("produto_id", id)
+
+      console.log("[v0] Registros dependentes excluídos da tabela products_availability")
+    } catch (dependencyError) {
+      console.log("[v0] Tabela products_availability não existe ou não há registros dependentes:", dependencyError)
+      // Continua com a exclusão do produto mesmo se não houver dependências
+    }
+
     const { error } = await supabase.from("products").delete().eq("id", id).eq("user_id", userId)
 
     if (error) {
@@ -309,6 +374,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Erro ao excluir produto" }, { status: 500 })
     }
 
+    console.log("[v0] Produto excluído com sucesso:", id)
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Erro na API de produtos:", error)
