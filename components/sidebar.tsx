@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils"
 import { ShoppingCart, Package, Users, Printer, Settings, ChefHat, X, FolderOpen, Plus } from "lucide-react"
 import type { Screen } from "./main-dashboard"
 import { useUser } from "./main-dashboard"
+import { useState, useEffect } from "react"
 
 interface SidebarProps {
   currentScreen: Screen
@@ -34,6 +35,41 @@ export function Sidebar({
   onToggleCollapse,
 }: SidebarProps) {
   const { user } = useUser()
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null)
+  const [companyName, setCompanyName] = useState<string>("Ana Food")
+
+  useEffect(() => {
+    const loadCompanyData = async () => {
+      try {
+        const response = await fetch("/api/companies", {
+          headers: {
+            "X-User-Email": "tarcisiorp16@gmail.com",
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data) {
+            setCompanyName(data.name || "Ana Food")
+            if (data.logo_url) {
+              setCompanyLogo(data.logo_url)
+            } else if (data.cnpj) {
+              // Tentar carregar logo do localStorage
+              const logoKey = `logo_${data.cnpj}`
+              const savedLogo = localStorage.getItem(logoKey)
+              if (savedLogo) {
+                setCompanyLogo(savedLogo)
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Erro ao carregar dados da empresa:", error)
+      }
+    }
+
+    loadCompanyData()
+  }, [])
 
   return (
     <>
@@ -55,19 +91,37 @@ export function Sidebar({
         >
           {!isCollapsed && (
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => onScreenChange("pedidos")}>
-              <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
-                <ChefHat className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-bold text-gray-900">Ana Food</span>
+              {companyLogo ? (
+                <img
+                  src={companyLogo || "/placeholder.svg"}
+                  alt="Logo da empresa"
+                  className="w-8 h-8 rounded-lg object-contain"
+                />
+              ) : (
+                <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
+                  <ChefHat className="w-5 h-5 text-white" />
+                </div>
+              )}
+              <span className="text-xl font-bold text-gray-900">{companyName}</span>
             </div>
           )}
 
           {isCollapsed && (
             <div
-              className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center cursor-pointer"
+              className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer overflow-hidden"
               onClick={() => onScreenChange("pedidos")}
             >
-              <ChefHat className="w-5 h-5 text-white" />
+              {companyLogo ? (
+                <img
+                  src={companyLogo || "/placeholder.svg"}
+                  alt="Logo da empresa"
+                  className="w-8 h-8 rounded-lg object-contain"
+                />
+              ) : (
+                <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
+                  <ChefHat className="w-5 h-5 text-white" />
+                </div>
+              )}
             </div>
           )}
 
@@ -115,18 +169,25 @@ export function Sidebar({
         </nav>
 
         {!isCollapsed && user && (
-          <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-gray-50">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center">
-                <span className="text-white font-semibold text-sm">
-                  {user.name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase()}
-                </span>
+          <div className="absolute bottom-0 left-0 right-0 border-t border-gray-200 bg-gray-50">
+            <Button
+              variant="ghost"
+              className="w-full p-4 h-auto justify-start hover:bg-gray-100"
+              onClick={() => onScreenChange("configuracoes")}
+            >
+              <div className="flex items-center gap-3 w-full">
+                <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-white font-semibold text-sm">
+                    {user.name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-sm font-medium text-gray-900 truncate">{user.name || "Usuário"}</p>
+                  <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                </div>
+                <Settings className="w-4 h-4 text-gray-400" />
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">{user.name || "Usuário"}</p>
-                <p className="text-xs text-gray-500 truncate">{user.email}</p>
-              </div>
-            </div>
+            </Button>
           </div>
         )}
       </aside>
