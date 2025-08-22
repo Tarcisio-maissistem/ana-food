@@ -742,78 +742,81 @@ export function EstabelecimentoScreen() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {diasSemana.map((dia) => (
-                  <div key={dia.key} className="flex items-center gap-4 p-4 border rounded-lg">
-                    <div className="w-24">
-                      <Label className="text-sm font-medium">{dia.label}</Label>
-                    </div>
+                {diasSemana.map((dia) => {
+                  const horarioDia = formData.horarios[dia.key as keyof typeof formData.horarios]
+                  if (!horarioDia) return null
 
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={!formData.horarios[dia.key as keyof typeof formData.horarios].fechado}
-                        onCheckedChange={(checked) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            horarios: {
-                              ...prev.horarios,
-                              [dia.key]: {
-                                ...prev.horarios[dia.key as keyof typeof prev.horarios],
-                                fechado: !checked,
+                  return (
+                    <div key={dia.key} className="flex flex-col gap-2 p-3 border rounded-lg">
+                      <Label className="font-medium">{dia.label}</Label>
+
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={!horarioDia.fechado}
+                          onCheckedChange={(checked) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              horarios: {
+                                ...prev.horarios,
+                                [dia.key]: {
+                                  ...prev.horarios[dia.key as keyof typeof prev.horarios],
+                                  fechado: !checked,
+                                },
                               },
-                            },
-                          }))
-                        }
-                      />
-                      <Label className="text-sm">Aberto</Label>
+                            }))
+                          }
+                        />
+                        <Label className="text-sm">Aberto</Label>
+                      </div>
+
+                      {!horarioDia.fechado && (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <Label className="text-sm">Abertura:</Label>
+                            <Input
+                              type="time"
+                              value={horarioDia.abertura}
+                              onChange={(e) =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  horarios: {
+                                    ...prev.horarios,
+                                    [dia.key]: {
+                                      ...prev.horarios[dia.key as keyof typeof prev.horarios],
+                                      abertura: e.target.value,
+                                    },
+                                  },
+                                }))
+                              }
+                              className="w-32"
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <Label className="text-sm">Fechamento:</Label>
+                            <Input
+                              type="time"
+                              value={horarioDia.fechamento}
+                              onChange={(e) =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  horarios: {
+                                    ...prev.horarios,
+                                    [dia.key]: {
+                                      ...prev.horarios[dia.key as keyof typeof prev.horarios],
+                                      fechamento: e.target.value,
+                                    },
+                                  },
+                                }))
+                              }
+                              className="w-32"
+                            />
+                          </div>
+                        </>
+                      )}
                     </div>
-
-                    {!formData.horarios[dia.key as keyof typeof formData.horarios].fechado && (
-                      <>
-                        <div className="flex items-center gap-2">
-                          <Label className="text-sm">Abertura:</Label>
-                          <Input
-                            type="time"
-                            value={formData.horarios[dia.key as keyof typeof formData.horarios].abertura}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                horarios: {
-                                  ...prev.horarios,
-                                  [dia.key]: {
-                                    ...prev.horarios[dia.key as keyof typeof prev.horarios],
-                                    abertura: e.target.value,
-                                  },
-                                },
-                              }))
-                            }
-                            className="w-32"
-                          />
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <Label className="text-sm">Fechamento:</Label>
-                          <Input
-                            type="time"
-                            value={formData.horarios[dia.key as keyof typeof formData.horarios].fechamento}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                horarios: {
-                                  ...prev.horarios,
-                                  [dia.key]: {
-                                    ...prev.horarios[dia.key as keyof typeof prev.horarios],
-                                    fechamento: e.target.value,
-                                  },
-                                },
-                              }))
-                            }
-                            className="w-32"
-                          />
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </CardContent>
           </Card>
