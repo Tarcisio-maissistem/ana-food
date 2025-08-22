@@ -113,17 +113,17 @@ export function EstabelecimentoScreen() {
           setEmpresa(data)
           setFormData({
             nomeFantasia: data.name || "",
-            razaoSocial: data.razao_social || "",
+            razaoSocial: data.razao_social || data.name || "",
             cnpj: data.cnpj || "",
             cpf: data.cpf || "",
             telefone: data.phone || "",
-            whatsapp: data.whatsapp || "",
+            whatsapp: data.whatsapp || data.phone || "",
             email: data.email || "",
             site: data.site || "",
             instagram: data.instagram || "",
             facebook: data.facebook || "",
 
-            rua: data.rua || "",
+            rua: data.rua || (data.address ? data.address.split(",")[0] : ""),
             numero: data.numero || "",
             complemento: data.complemento || "",
             bairro: data.bairro || "",
@@ -141,7 +141,7 @@ export function EstabelecimentoScreen() {
               domingo: { abertura: "08:00", fechamento: "22:00", fechado: true },
             },
 
-            tempoMedioPreparo: data.tempo_medio_preparo || "30",
+            tempoMedioPreparo: data.tempo_medio_preparo || data.delivery_time?.replace(/\D/g, "") || "30",
             retiradaLocal: data.retirada_local !== false,
             entregaPropria: data.entrega_propria !== false,
             entregaMotoboy: data.entrega_motoboy || false,
@@ -398,11 +398,12 @@ export function EstabelecimentoScreen() {
       </div>
 
       <Tabs defaultValue="basico" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="basico">Básico</TabsTrigger>
           <TabsTrigger value="endereco">Endereço</TabsTrigger>
           <TabsTrigger value="funcionamento">Funcionamento</TabsTrigger>
           <TabsTrigger value="operacao">Operação</TabsTrigger>
+          <TabsTrigger value="pagamentos">Pagamentos</TabsTrigger>
           <TabsTrigger value="midia">Mídia</TabsTrigger>
         </TabsList>
 
@@ -880,6 +881,84 @@ export function EstabelecimentoScreen() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="pagamentos" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Formas de Pagamento</CardTitle>
+              <CardDescription>Configure as formas de pagamento aceitas pelo estabelecimento</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <Label className="font-medium">Dinheiro</Label>
+                    <p className="text-sm text-gray-500">Pagamento em espécie</p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <Label className="font-medium">Cartão de Crédito</Label>
+                    <p className="text-sm text-gray-500">Visa, Mastercard, etc.</p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <Label className="font-medium">Cartão de Débito</Label>
+                    <p className="text-sm text-gray-500">Débito direto</p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <Label className="font-medium">PIX</Label>
+                    <p className="text-sm text-gray-500">Pagamento instantâneo</p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <Label className="font-medium">Vale Refeição</Label>
+                    <p className="text-sm text-gray-500">Ticket, Sodexo, etc.</p>
+                  </div>
+                  <Switch />
+                </div>
+
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <Label className="font-medium">Vale Alimentação</Label>
+                    <p className="text-sm text-gray-500">Alelo, VR, etc.</p>
+                  </div>
+                  <Switch />
+                </div>
+              </div>
+
+              <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                <h4 className="font-medium text-blue-900 mb-2">Configurações de Pagamento</h4>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Aceitar troco para dinheiro</Label>
+                    <Switch defaultChecked />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Valor mínimo para cartão</Label>
+                    <Input type="number" placeholder="10.00" className="w-24 h-8" />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Taxa de entrega</Label>
+                    <Input type="number" placeholder="5.00" className="w-24 h-8" />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="midia" className="space-y-6">

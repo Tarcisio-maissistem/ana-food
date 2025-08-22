@@ -21,9 +21,6 @@ import {
   RefreshCw,
   Clock,
   User,
-  CreditCard,
-  Plus,
-  Trash2,
   Camera,
   Loader2,
   AlertCircle,
@@ -76,14 +73,8 @@ const SettingsScreen = () => {
     notifications: true,
   })
 
-  const [paymentMethods, setPaymentMethods] = useState([
-    { id: "1", name: "Dinheiro", active: true, default: true },
-    { id: "2", name: "Cartão de Crédito", active: true, default: true },
-    { id: "3", name: "Cartão de Débito", active: true, default: true },
-    { id: "4", name: "PIX", active: true, default: true },
-  ])
-
   const [newPaymentMethod, setNewPaymentMethod] = useState("")
+
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [establishmentData, setEstablishmentData] = useState<EstablishmentData>({
@@ -579,38 +570,6 @@ const SettingsScreen = () => {
     reader.readAsDataURL(file)
   }
 
-  const addPaymentMethod = () => {
-    if (!newPaymentMethod.trim()) return
-
-    const newMethod = {
-      id: Date.now().toString(),
-      name: newPaymentMethod,
-      active: true,
-      default: false,
-    }
-
-    setPaymentMethods((prev) => [...prev, newMethod])
-    setNewPaymentMethod("")
-    toast.success("Forma de pagamento adicionada!")
-  }
-
-  const removePaymentMethod = (id: string) => {
-    const method = paymentMethods.find((m) => m.id === id)
-    if (method?.default) {
-      toast.error("Não é possível remover formas de pagamento padrão")
-      return
-    }
-
-    setPaymentMethods((prev) => prev.filter((m) => m.id !== id))
-    toast.success("Forma de pagamento removida!")
-  }
-
-  const togglePaymentMethod = (id: string) => {
-    setPaymentMethods((prev) =>
-      prev.map((method) => (method.id === id ? { ...method, active: !method.active } : method)),
-    )
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -630,10 +589,6 @@ const SettingsScreen = () => {
           <TabsTrigger value="estabelecimento" className="flex items-center gap-2">
             <Building2 className="w-4 h-4" />
             <span className="hidden sm:inline">Estabelecimento</span>
-          </TabsTrigger>
-          <TabsTrigger value="pagamento" className="flex items-center gap-2">
-            <CreditCard className="w-4 h-4" />
-            <span className="hidden sm:inline">Pagamento</span>
           </TabsTrigger>
           <TabsTrigger value="notifications" className="flex items-center gap-2">
             <Bell className="w-4 h-4" />
@@ -760,59 +715,6 @@ const SettingsScreen = () => {
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
-
-        <TabsContent value="pagamento">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="w-5 h-5" />
-                Formas de Pagamento
-              </CardTitle>
-              <CardDescription>Configure as formas de pagamento aceitas pelo estabelecimento</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Nova forma de pagamento"
-                  value={newPaymentMethod}
-                  onChange={(e) => setNewPaymentMethod(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && addPaymentMethod()}
-                />
-                <Button onClick={addPaymentMethod} className="bg-orange-500 hover:bg-orange-600">
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {paymentMethods.map((method) => (
-                  <div key={method.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Switch checked={method.active} onCheckedChange={() => togglePaymentMethod(method.id)} />
-                      <div>
-                        <p className="font-medium">{method.name}</p>
-                        {method.default && (
-                          <Badge variant="secondary" className="text-xs">
-                            Padrão
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                    {!method.default && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removePaymentMethod(method.id)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="empresa">
