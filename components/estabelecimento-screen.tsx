@@ -82,6 +82,7 @@ export function EstabelecimentoScreen() {
   })
 
   useEffect(() => {
+    console.log("[v0] EstabelecimentoScreen: Componente montado, iniciando carregamento")
     loadEmpresaData()
   }, [])
 
@@ -94,18 +95,21 @@ export function EstabelecimentoScreen() {
   const loadEmpresaData = async () => {
     setLoading(true)
     try {
-      console.log("Carregando dados da empresa...")
+      console.log("[v0] EstabelecimentoScreen: Iniciando carregamento dos dados da empresa...")
       const response = await fetch("/api/companies", {
         headers: {
           "X-User-Email": "tarcisiorp16@gmail.com",
         },
       })
 
+      console.log("[v0] EstabelecimentoScreen: Response status:", response.status)
+
       if (response.ok) {
         const data = await response.json()
-        console.log("Dados recebidos:", data)
+        console.log("[v0] EstabelecimentoScreen: Dados recebidos da API:", data)
 
         if (data && (data.name || data.cnpj)) {
+          console.log("[v0] EstabelecimentoScreen: Dados válidos encontrados, atualizando formulário")
           setEmpresa(data)
           setFormData({
             nomeFantasia: data.name || "",
@@ -144,12 +148,15 @@ export function EstabelecimentoScreen() {
 
             linkCardapio: data.link_cardapio || "",
           })
+          console.log("[v0] EstabelecimentoScreen: FormData atualizado com sucesso")
         } else {
-          console.log("Nenhum dado encontrado, usando dados vazios")
+          console.log("[v0] EstabelecimentoScreen: Nenhum dado válido encontrado, usando dados padrão")
         }
+      } else {
+        console.log("[v0] EstabelecimentoScreen: Erro na resposta da API:", response.status, response.statusText)
       }
     } catch (error) {
-      console.error("Erro ao carregar dados da empresa:", error)
+      console.error("[v0] EstabelecimentoScreen: Erro ao carregar dados da empresa:", error)
       // @ts-ignore
       window.showToast?.({
         type: "error",
@@ -158,6 +165,7 @@ export function EstabelecimentoScreen() {
       })
     } finally {
       setLoading(false)
+      console.log("[v0] EstabelecimentoScreen: Carregamento finalizado")
     }
   }
 
@@ -355,6 +363,7 @@ export function EstabelecimentoScreen() {
   }
 
   if (loading) {
+    console.log("[v0] EstabelecimentoScreen: Renderizando estado de loading")
     return (
       <div className="flex items-center justify-center h-64">
         <RefreshCw className="h-8 w-8 animate-spin text-orange-500" />
@@ -371,6 +380,11 @@ export function EstabelecimentoScreen() {
     { key: "sabado", label: "Sábado" },
     { key: "domingo", label: "Domingo" },
   ]
+
+  console.log(
+    "[v0] EstabelecimentoScreen: Renderizando formulário com dados:",
+    formData.nomeFantasia ? "COM DADOS" : "SEM DADOS",
+  )
 
   return (
     <div className="space-y-6 pb-6">
