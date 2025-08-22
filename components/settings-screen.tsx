@@ -118,7 +118,7 @@ const SettingsScreen = () => {
 
   const [selectedTheme, setSelectedTheme] = useState("orange")
   const [showQrModal, setShowQrModal] = useState(false)
-  const [isConnecting, setIsConnecting] = useState(isConnecting)
+  const [isConnecting, setIsConnecting] = useState(false)
   const [isCheckingStatus, setIsCheckingStatus] = useState(false)
 
   const apiKey = process.env.NEXT_PUBLIC_EVOLUTION_API_KEY || ""
@@ -233,7 +233,7 @@ const SettingsScreen = () => {
     wednesday: { open: "18:00", close: "23:00", enabled: true },
     thursday: { open: "18:00", close: "23:00", enabled: true },
     friday: { open: "18:00", close: "23:00", enabled: true },
-    saturday: { open: "18:00", close: "23:00", enabled: true },
+    saturday: { open: "18:00", close: "23:00", enabled: false },
     sunday: { open: "18:00", close: "23:00", enabled: false },
   })
 
