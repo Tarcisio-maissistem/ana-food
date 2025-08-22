@@ -1,18 +1,39 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+
+import { useState, useEffect, useRef } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { MessageSquare, QrCode, RefreshCw, Power, Loader2, AlertCircle, Clock, Bell, Send, Save } from "lucide-react"
-import { EstabelecimentoScreen } from "./estabelecimento-screen"
-import { getEmpresa, getInstanceName, type EmpresaData } from "@/utils/cache-empresa"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import {
+  Building2,
+  Bell,
+  Palette,
+  MessageSquare,
+  QrCode,
+  Send,
+  RefreshCw,
+  Clock,
+  User,
+  CreditCard,
+  Plus,
+  Trash2,
+  Camera,
+  Save,
+  Loader2,
+  AlertCircle,
+  Power,
+} from "lucide-react"
+import { toast } from "react-hot-toast"
+import { useUser } from "./main-dashboard"
+import { EstabelecimentoScreen } from "./estabelecimento-screen"
+import { getEmpresa, getInstanceName, type EmpresaData } from "@/utils/cache-empresa"
 import { callEvolutionAPI } from "@/utils/api" // Import callEvolutionAPI
 
 interface EstablishmentData {
@@ -46,7 +67,26 @@ interface WhatsAppSession {
 const EVOLUTION_API_BASE_URL = "https://evo.anafood.vip"
 
 const SettingsScreen = () => {
-  const [activeTab, setActiveTab] = useState("estabelecimento")
+  const [activeTab, setActiveTab] = useState("perfil")
+  const { user } = useUser()
+  const [profileData, setProfileData] = useState({
+    name: user?.name || "",
+    email: user?.email || "",
+    avatar: null as string | null,
+    theme: "light" as "light" | "dark",
+    notifications: true,
+  })
+
+  const [paymentMethods, setPaymentMethods] = useState([
+    { id: "1", name: "Dinheiro", active: true, default: true },
+    { id: "2", name: "Cartão de Crédito", active: true, default: true },
+    { id: "3", name: "Cartão de Débito", active: true, default: true },
+    { id: "4", name: "PIX", active: true, default: true },
+  ])
+
+  const [newPaymentMethod, setNewPaymentMethod] = useState("")
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const [establishmentData, setEstablishmentData] = useState<EstablishmentData>({
     name: "Ana Food",
     cnpj: "12.345.678/0001-90",
@@ -78,7 +118,7 @@ const SettingsScreen = () => {
 
   const [selectedTheme, setSelectedTheme] = useState("orange")
   const [showQrModal, setShowQrModal] = useState(false)
-  const [isConnecting, setIsConnecting] = useState(false)
+  const [isConnecting, setIsConnecting] = useState(isConnecting)
   const [isCheckingStatus, setIsCheckingStatus] = useState(false)
 
   const apiKey = process.env.NEXT_PUBLIC_EVOLUTION_API_KEY || ""
@@ -527,19 +567,284 @@ const SettingsScreen = () => {
     }
   }
 
+  const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const result = e.target?.result as string
+      setProfileData((prev) => ({ ...prev, avatar: result }))
+      toast.success("Foto de perfil atualizada!")
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const addPaymentMethod = () => {
+    if (!newPaymentMethod.trim()) return
+
+    const newMethod = {
+      id: Date.now().toString(),
+      name: newPaymentMethod,
+      active: true,
+      default: false,
+    }
+
+    setPaymentMethods((prev) => [...prev, newMethod])
+    setNewPaymentMethod("")
+    toast.success("Forma de pagamento adicionada!")
+  }
+
+  const removePaymentMethod = (id: string) => {
+    const method = paymentMethods.find((m) => m.id === id)
+    if (method?.default) {
+      toast.error("Não é possível remover formas de pagamento padrão")
+      return
+    }
+
+    setPaymentMethods((prev) => prev.filter((m) => m.id !== id))
+    toast.success("Forma de pagamento removida!")
+  }
+
+  const togglePaymentMethod = (id: string) => {
+    setPaymentMethods((prev) =>
+      prev.map((method) => (method.id === id ? { ...method, active: !method.active } : method)),
+    )
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Configurações</h2>
+      <div className="flex items-center gap-3">
+        <User className="h-6 w-6 text-orange-500" />
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Configurações</h2>
+          <p className="text-gray-600">Gerencie suas preferências e configurações do sistema</p>
+        </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="estabelecimento">Estabelecimento</TabsTrigger>
-          <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
-          <TabsTrigger value="notifications">Notificações</TabsTrigger>
-          <TabsTrigger value="appearance">Aparência</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-6">
+          <TabsTrigger value="perfil" className="flex items-center gap-2">
+            <User className="w-4 h-4" />
+            <span className="hidden sm:inline">Perfil</span>
+          </TabsTrigger>
+          <TabsTrigger value="empresa" className="flex items-center gap-2">
+            <Building2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Empresa</span>
+          </TabsTrigger>
+          <TabsTrigger value="pagamento" className="flex items-center gap-2">
+            <CreditCard className="w-4 h-4" />
+            <span className="hidden sm:inline">Pagamento</span>
+          </TabsTrigger>
+          <TabsTrigger value="notifications" className="flex items-center gap-2">
+            <Bell className="w-4 h-4" />
+            <span className="hidden sm:inline">Notificações</span>
+          </TabsTrigger>
+          <TabsTrigger value="appearance" className="flex items-center gap-2">
+            <Palette className="w-4 h-4" />
+            <span className="hidden sm:inline">Aparência</span>
+          </TabsTrigger>
+          <TabsTrigger value="whatsapp" className="flex items-center gap-2">
+            <MessageSquare className="w-4 h-4" />
+            <span className="hidden sm:inline">WhatsApp</span>
+          </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="perfil">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="w-5 h-5" />
+                  Informações Pessoais
+                </CardTitle>
+                <CardDescription>Configure seus dados pessoais</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex flex-col items-center space-y-4">
+                  <div className="relative">
+                    <div className="w-24 h-24 bg-orange-500 rounded-full flex items-center justify-center overflow-hidden">
+                      {profileData.avatar ? (
+                        <img
+                          src={profileData.avatar || "/placeholder.svg"}
+                          alt="Avatar"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-white text-2xl font-semibold">
+                          {user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="absolute -bottom-2 -right-2 rounded-full w-8 h-8 p-0 bg-transparent"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Camera className="w-4 h-4" />
+                    </Button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarUpload}
+                      className="hidden"
+                    />
+                  </div>
+                  <div className="text-center">
+                    <p className="font-medium text-gray-900">{user?.name || "Usuário"}</p>
+                    <p className="text-sm text-gray-500">{user?.email}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="name">Nome Completo</Label>
+                    <Input
+                      id="name"
+                      value={profileData.name}
+                      onChange={(e) => setProfileData((prev) => ({ ...prev, name: e.target.value }))}
+                      placeholder="Seu nome completo"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="email">E-mail</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={profileData.email}
+                      onChange={(e) => setProfileData((prev) => ({ ...prev, email: e.target.value }))}
+                      placeholder="seu@email.com"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Preferências</CardTitle>
+                <CardDescription>Configure suas preferências pessoais</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Tema Escuro</Label>
+                    <p className="text-sm text-gray-600">Ativar modo escuro para reduzir cansaço visual</p>
+                  </div>
+                  <Switch
+                    checked={profileData.theme === "dark"}
+                    onCheckedChange={(checked) => {
+                      setProfileData((prev) => ({ ...prev, theme: checked ? "dark" : "light" }))
+                      document.documentElement.classList.toggle("dark", checked)
+                      toast.success(`Tema ${checked ? "escuro" : "claro"} ativado!`)
+                    }}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Notificações</Label>
+                    <p className="text-sm text-gray-600">Receber notificações do sistema</p>
+                  </div>
+                  <Switch
+                    checked={profileData.notifications}
+                    onCheckedChange={(checked) => {
+                      setProfileData((prev) => ({ ...prev, notifications: checked }))
+                      toast.success(`Notificações ${checked ? "ativadas" : "desativadas"}!`)
+                    }}
+                  />
+                </div>
+
+                <Button className="w-full bg-orange-500 hover:bg-orange-600">
+                  <User className="w-4 h-4 mr-2" />
+                  Salvar Perfil
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="pagamento">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="w-5 h-5" />
+                Formas de Pagamento
+              </CardTitle>
+              <CardDescription>Configure as formas de pagamento aceitas pelo estabelecimento</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Nova forma de pagamento"
+                  value={newPaymentMethod}
+                  onChange={(e) => setNewPaymentMethod(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && addPaymentMethod()}
+                />
+                <Button onClick={addPaymentMethod} className="bg-orange-500 hover:bg-orange-600">
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {paymentMethods.map((method) => (
+                  <div key={method.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Switch checked={method.active} onCheckedChange={() => togglePaymentMethod(method.id)} />
+                      <div>
+                        <p className="font-medium">{method.name}</p>
+                        {method.default && (
+                          <Badge variant="secondary" className="text-xs">
+                            Padrão
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    {!method.default && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removePaymentMethod(method.id)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="empresa">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="w-5 h-5" />
+                Configurações da Empresa
+              </CardTitle>
+              <CardDescription>Acesse as configurações detalhadas do estabelecimento</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <Building2 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 mb-4">
+                  Configure os dados da sua empresa na seção específica do estabelecimento
+                </p>
+                <Button
+                  onClick={() => (window.location.href = "#estabelecimento")}
+                  className="bg-orange-500 hover:bg-orange-600"
+                >
+                  Ir para Estabelecimento
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="estabelecimento">
           <div className="space-y-6">
@@ -966,17 +1271,7 @@ const SettingsScreen = () => {
 
                 <div className="space-y-3">
                   <label className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      checked={notifications.newOrders}
-                      onChange={(e) =>
-                        setNotifications((prev) => ({
-                          ...prev,
-                          newOrders: e.target.checked,
-                        }))
-                      }
-                      className="rounded"
-                    />
+                    <Switch defaultChecked />
                     <div>
                       <p className="font-medium">Novos Pedidos</p>
                       <p className="text-sm text-gray-600">Alerta quando um novo pedido chegar</p>
@@ -984,17 +1279,7 @@ const SettingsScreen = () => {
                   </label>
 
                   <label className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      checked={notifications.soundEnabled}
-                      onChange={(e) =>
-                        setNotifications((prev) => ({
-                          ...prev,
-                          soundEnabled: e.target.checked,
-                        }))
-                      }
-                      className="rounded"
-                    />
+                    <Switch defaultChecked />
                     <div>
                       <p className="font-medium">Alertas Sonoros</p>
                       <p className="text-sm text-gray-600">Reproduzir som para notificações</p>
@@ -1002,17 +1287,7 @@ const SettingsScreen = () => {
                   </label>
 
                   <label className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      checked={notifications.emailNotifications}
-                      onChange={(e) =>
-                        setNotifications((prev) => ({
-                          ...prev,
-                          emailNotifications: e.target.checked,
-                        }))
-                      }
-                      className="rounded"
-                    />
+                    <Switch />
                     <div>
                       <p className="font-medium">Notificações por E-mail</p>
                       <p className="text-sm text-gray-600">Receber resumos por e-mail</p>
@@ -1025,56 +1300,26 @@ const SettingsScreen = () => {
         </TabsContent>
 
         <TabsContent value="appearance">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Modo de Exibição</CardTitle>
-                <CardDescription>Configure o tema da interface</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="dark-mode">Modo Escuro</Label>
-                    <p className="text-sm text-gray-600">Ativar tema escuro para reduzir o cansaço visual</p>
-                  </div>
-                  <Switch
-                    id="dark-mode"
-                    checked={isDarkMode}
-                    onCheckedChange={(checked) => {
-                      setIsDarkMode(checked)
-                      // Implementar lógica do tema escuro
-                      document.documentElement.classList.toggle("dark", checked)
-                      localStorage.setItem("ana-food-dark-mode", checked.toString())
-                    }}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Cores do Sistema</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                  {themes.map((theme) => (
-                    <button
-                      key={theme.id}
-                      onClick={() => setSelectedTheme(theme.id)}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        selectedTheme === theme.id
-                          ? "border-gray-900 shadow-md"
-                          : "border-gray-200 hover:border-gray-300"
-                      }`}
-                    >
-                      <div className={`w-8 h-8 ${theme.primary} rounded-full mx-auto mb-2`} />
-                      <p className="text-sm font-medium text-gray-900">{theme.name}</p>
-                    </button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Palette className="w-5 h-5" />
+                Aparência do Sistema
+              </CardTitle>
+              <CardDescription>Personalize a aparência da interface</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <Palette className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 mb-4">
+                  As configurações de aparência foram movidas para o seu perfil pessoal
+                </p>
+                <Button onClick={() => setActiveTab("perfil")} className="bg-orange-500 hover:bg-orange-600">
+                  Ir para Perfil
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 
@@ -1173,3 +1418,4 @@ function getStatusText(status: string) {
 }
 
 export { SettingsScreen }
+export default SettingsScreen

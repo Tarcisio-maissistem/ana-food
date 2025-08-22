@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { ShoppingCart, Package, Users, Printer, Settings, ChefHat, X, FolderOpen, Plus } from "lucide-react"
 import type { Screen } from "./main-dashboard"
+import { useUser } from "./main-dashboard"
 
 interface SidebarProps {
   currentScreen: Screen
@@ -32,6 +33,8 @@ export function Sidebar({
   isCollapsed,
   onToggleCollapse,
 }: SidebarProps) {
+  const { user } = useUser()
+
   return (
     <>
       {/* Overlay para mobile */}
@@ -110,6 +113,22 @@ export function Sidebar({
             )
           })}
         </nav>
+
+        {!isCollapsed && user && (
+          <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-gray-50">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center">
+                <span className="text-white font-semibold text-sm">
+                  {user.name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">{user.name || "Usuário"}</p>
+                <p className="text-xs text-gray-500 truncate">{user.email}</p>
+              </div>
+            </div>
+          </div>
+        )}
       </aside>
     </>
   )

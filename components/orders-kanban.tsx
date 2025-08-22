@@ -442,7 +442,7 @@ export function OrdersKanban() {
 
   useEffect(() => {
     loadOrders()
-    const interval = setInterval(loadWhatsappAlerts, 30000)
+    const interval = setInterval(loadWhatsappAlerts, 60000)
     return () => clearInterval(interval)
   }, [])
 
