@@ -82,7 +82,15 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 })
     }
 
-    const companyData = {
+    const { data: tableInfo } = await supabase.from("companies").select("*").limit(1).maybeSingle()
+
+    let availableColumns: string[] = []
+    if (tableInfo) {
+      availableColumns = Object.keys(tableInfo)
+      console.log("[v0] API Companies: Colunas disponíveis:", availableColumns)
+    }
+
+    const allFields = {
       name: body.name || "",
       razao_social: body.razao_social || "",
       cnpj: body.cnpj || "",
@@ -111,6 +119,15 @@ export async function PUT(request: NextRequest) {
       user_id: user.id,
       updated_at: new Date().toISOString(),
     }
+
+    const companyData: any = {}
+    Object.keys(allFields).forEach((key) => {
+      if (availableColumns.includes(key)) {
+        companyData[key] = allFields[key as keyof typeof allFields]
+      } else {
+        console.log(`[v0] API Companies: Ignorando campo '${key}' que não existe na tabela`)
+      }
+    })
 
     const { data: existingCompany } = await supabase.from("companies").select("id").eq("user_id", user.id).maybeSingle()
 
