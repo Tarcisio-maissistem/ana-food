@@ -25,7 +25,6 @@ import {
   Plus,
   Trash2,
   Camera,
-  Save,
   Loader2,
   AlertCircle,
   Power,
@@ -623,14 +622,14 @@ const SettingsScreen = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-6">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="perfil" className="flex items-center gap-2">
             <User className="w-4 h-4" />
             <span className="hidden sm:inline">Perfil</span>
           </TabsTrigger>
-          <TabsTrigger value="empresa" className="flex items-center gap-2">
+          <TabsTrigger value="estabelecimento" className="flex items-center gap-2">
             <Building2 className="w-4 h-4" />
-            <span className="hidden sm:inline">Empresa</span>
+            <span className="hidden sm:inline">Estabelecimento</span>
           </TabsTrigger>
           <TabsTrigger value="pagamento" className="flex items-center gap-2">
             <CreditCard className="w-4 h-4" />
@@ -639,10 +638,6 @@ const SettingsScreen = () => {
           <TabsTrigger value="notifications" className="flex items-center gap-2">
             <Bell className="w-4 h-4" />
             <span className="hidden sm:inline">Notificações</span>
-          </TabsTrigger>
-          <TabsTrigger value="appearance" className="flex items-center gap-2">
-            <Palette className="w-4 h-4" />
-            <span className="hidden sm:inline">Aparência</span>
           </TabsTrigger>
           <TabsTrigger value="whatsapp" className="flex items-center gap-2">
             <MessageSquare className="w-4 h-4" />
@@ -849,87 +844,6 @@ const SettingsScreen = () => {
         <TabsContent value="estabelecimento">
           <div className="space-y-6">
             <EstabelecimentoScreen />
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="w-5 h-5" />
-                  Horário de Funcionamento
-                </CardTitle>
-                <CardDescription>Configure os horários de abertura e fechamento</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {Object.entries(workingHours).map(([day, hours]) => {
-                  const dayNames = {
-                    monday: "Segunda-feira",
-                    tuesday: "Terça-feira",
-                    wednesday: "Quarta-feira",
-                    thursday: "Quinta-feira",
-                    friday: "Sexta-feira",
-                    saturday: "Sábado",
-                    sunday: "Domingo",
-                  }
-
-                  return (
-                    <div key={day} className="flex items-center gap-4 p-3 border rounded-lg">
-                      <div className="flex items-center gap-2 min-w-[120px]">
-                        <Switch
-                          checked={hours.enabled}
-                          onCheckedChange={(enabled) =>
-                            setWorkingHours((prev) => ({
-                              ...prev,
-                              [day]: { ...prev[day as keyof typeof prev], enabled },
-                            }))
-                          }
-                        />
-                        <Label className="text-sm font-medium">{dayNames[day as keyof typeof dayNames]}</Label>
-                      </div>
-
-                      {hours.enabled && (
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="time"
-                            value={hours.open}
-                            onChange={(e) =>
-                              setWorkingHours((prev) => ({
-                                ...prev,
-                                [day]: { ...prev[day as keyof typeof prev], open: e.target.value },
-                              }))
-                            }
-                            className="w-24"
-                          />
-                          <span className="text-gray-500">às</span>
-                          <Input
-                            type="time"
-                            value={hours.close}
-                            onChange={(e) =>
-                              setWorkingHours((prev) => ({
-                                ...prev,
-                                [day]: { ...prev[day as keyof typeof prev], close: e.target.value },
-                              }))
-                            }
-                            className="w-24"
-                          />
-                        </div>
-                      )}
-
-                      {!hours.enabled && <span className="text-gray-500 text-sm">Fechado</span>}
-                    </div>
-                  )
-                })}
-
-                <Button
-                  onClick={() => {
-                    localStorage.setItem("ana-food-working-hours", JSON.stringify(workingHours))
-                    alert("Horários salvos com sucesso!")
-                  }}
-                  className="w-full"
-                >
-                  <Save className="w-4 h-4 mr-2" />
-                  Salvar Horários
-                </Button>
-              </CardContent>
-            </Card>
           </div>
         </TabsContent>
 
