@@ -25,6 +25,16 @@ import {
 } from "lucide-react"
 import { formatCNPJ, formatTelefone, type EmpresaData } from "@/utils/cache-empresa"
 
+const formatCPF = (cpf: string) => {
+  if (!cpf) return ""
+  const cleaned = cpf.replace(/\D/g, "")
+  const match = cleaned.match(/^(\d{3})(\d{3})(\d{3})(\d{2})$/)
+  if (match) {
+    return `${match[1]}.${match[2]}.${match[3]}-${match[4]}`
+  }
+  return cleaned
+}
+
 export function EstabelecimentoScreen() {
   const [empresa, setEmpresa] = useState<EmpresaData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -59,6 +69,7 @@ export function EstabelecimentoScreen() {
     cidade: "",
     uf: "",
     cep: "",
+    locationLink: "",
 
     // Funcionamento
     horarios: {
@@ -67,7 +78,7 @@ export function EstabelecimentoScreen() {
       quarta: { abertura: "08:00", fechamento: "22:00", fechado: false },
       quinta: { abertura: "08:00", fechamento: "22:00", fechado: false },
       sexta: { abertura: "08:00", fechamento: "22:00", fechado: false },
-      sabado: { abertura: "08:00", fechamento: "22:00", fechado: false },
+      sabado: { abertura: "08:00", fechamento: "22:00", fechado: true },
       domingo: { abertura: "08:00", fechamento: "22:00", fechado: true },
     },
 
@@ -130,6 +141,7 @@ export function EstabelecimentoScreen() {
             cidade: data.cidade || "",
             uf: data.uf || "",
             cep: data.cep || "",
+            locationLink: data.location_link || "",
 
             horarios: data.horarios || {
               segunda: { abertura: "08:00", fechamento: "22:00", fechado: false },
@@ -137,7 +149,7 @@ export function EstabelecimentoScreen() {
               quarta: { abertura: "08:00", fechamento: "22:00", fechado: false },
               quinta: { abertura: "08:00", fechamento: "22:00", fechado: false },
               sexta: { abertura: "08:00", fechamento: "22:00", fechado: false },
-              sabado: { abertura: "08:00", fechamento: "22:00", fechado: false },
+              sabado: { abertura: "08:00", fechamento: "22:00", fechado: true },
               domingo: { abertura: "08:00", fechamento: "22:00", fechado: true },
             },
 
@@ -324,6 +336,7 @@ export function EstabelecimentoScreen() {
           cidade: formData.cidade,
           uf: formData.uf,
           cep: formData.cep,
+          location_link: formData.locationLink,
 
           horarios: formData.horarios,
           tempo_medio_preparo: formData.tempoMedioPreparo,
@@ -398,9 +411,8 @@ export function EstabelecimentoScreen() {
       </div>
 
       <Tabs defaultValue="basico" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="basico">Básico</TabsTrigger>
-          <TabsTrigger value="endereco">Endereço</TabsTrigger>
           <TabsTrigger value="funcionamento">Funcionamento</TabsTrigger>
           <TabsTrigger value="operacao">Operação</TabsTrigger>
           <TabsTrigger value="pagamentos">Pagamentos</TabsTrigger>
@@ -538,7 +550,7 @@ export function EstabelecimentoScreen() {
                       <Label htmlFor="cpf">CPF (se pessoa física)</Label>
                       <Input
                         id="cpf"
-                        value={formData.cpf}
+                        value={formatCPF(formData.cpf)}
                         onChange={(e) => setFormData((prev) => ({ ...prev, cpf: e.target.value.replace(/\D/g, "") }))}
                         placeholder="000.000.000-00"
                         maxLength={14}
@@ -616,16 +628,14 @@ export function EstabelecimentoScreen() {
               </Card>
             </div>
           </div>
-        </TabsContent>
 
-        <TabsContent value="endereco" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <MapPin className="h-5 w-5" />
-                Endereço Completo
+                Endereço e Localização
               </CardTitle>
-              <CardDescription>Localização do estabelecimento</CardDescription>
+              <CardDescription>Localização do estabelecimento para cálculo de entrega</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -699,6 +709,22 @@ export function EstabelecimentoScreen() {
                     placeholder="00000-000"
                     maxLength={9}
                   />
+                </div>
+
+                <div className="md:col-span-3 space-y-2">
+                  <Label htmlFor="locationLink" className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4" />
+                    Link de Localização (Google Maps)
+                  </Label>
+                  <Input
+                    id="locationLink"
+                    value={formData.locationLink}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, locationLink: e.target.value }))}
+                    placeholder="https://maps.google.com/..."
+                  />
+                  <p className="text-xs text-gray-500">
+                    Cole o link do Google Maps para cálculo automático de taxa de entrega por distância
+                  </p>
                 </div>
               </div>
             </CardContent>
