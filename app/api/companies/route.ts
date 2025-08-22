@@ -6,105 +6,149 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PU
 
 export async function GET(request: NextRequest) {
   try {
-    const userEmail = request.headers.get("X-User-Email")
+    const userEmail = request.headers.get("X-User-Email") || "tarcisiorp16@gmail.com"
+    console.log("[v0] API Companies: Buscando empresa para usuário:", userEmail)
+
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    if (userEmail) {
-      const { data: user } = await supabase.from("users").select("id").eq("email", userEmail).single()
+    const { data: user } = await supabase.from("users").select("id").eq("email", userEmail).maybeSingle()
 
-      if (user) {
-        const { data: company, error } = await supabase
-          .from("companies")
-          .select("*")
-          .eq("user_id", user.id)
-          .maybeSingle()
+    if (user) {
+      console.log("[v0] API Companies: Usuário encontrado:", user.id)
 
-        if (!error && company) {
-          return NextResponse.json(company)
-        }
+      const { data: company, error } = await supabase.from("companies").select("*").eq("user_id", user.id).maybeSingle()
+
+      if (!error && company) {
+        console.log("[v0] API Companies: Empresa encontrada:", company.name)
+        return NextResponse.json(company)
+      } else {
+        console.log("[v0] API Companies: Nenhuma empresa encontrada para o usuário")
       }
     }
 
-    // Retorna dados vazios se não encontrar
     return NextResponse.json({
       name: "",
+      razao_social: "",
       cnpj: "",
-      address: "",
-      location_link: "",
-      working_hours: "",
-      delivery_time: "",
-      minimum_order: "",
-      notes: "",
+      cpf: "",
       phone: "",
+      whatsapp: "",
       email: "",
+      site: "",
+      instagram: "",
+      facebook: "",
+      rua: "",
+      numero: "",
+      complemento: "",
+      bairro: "",
+      cidade: "",
+      uf: "",
+      cep: "",
+      horarios: {
+        segunda: { abertura: "08:00", fechamento: "22:00", fechado: false },
+        terca: { abertura: "08:00", fechamento: "22:00", fechado: false },
+        quarta: { abertura: "08:00", fechamento: "22:00", fechado: false },
+        quinta: { abertura: "08:00", fechamento: "22:00", fechado: false },
+        sexta: { abertura: "08:00", fechamento: "22:00", fechado: false },
+        sabado: { abertura: "08:00", fechamento: "22:00", fechado: false },
+        domingo: { abertura: "08:00", fechamento: "22:00", fechado: true },
+      },
+      tempo_medio_preparo: "30",
+      retirada_local: true,
+      entrega_propria: true,
+      entrega_motoboy: false,
+      link_cardapio: "",
+      logo_url: null,
+      photos: [],
     })
   } catch (error) {
-    console.error("Erro na API de companies:", error)
+    console.error("[v0] API Companies: Erro:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
 
 export async function PUT(request: NextRequest) {
   try {
-    const userEmail = request.headers.get("X-User-Email")
+    const userEmail = request.headers.get("X-User-Email") || "tarcisiorp16@gmail.com"
     const body = await request.json()
+    console.log("[v0] API Companies: Salvando dados para usuário:", userEmail)
+    console.log("[v0] API Companies: Dados recebidos:", Object.keys(body))
+
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    if (userEmail) {
-      const { data: user } = await supabase.from("users").select("id").eq("email", userEmail).single()
+    const { data: user } = await supabase.from("users").select("id").eq("email", userEmail).maybeSingle()
 
-      if (user) {
-        // Try to update existing company
-        const { data: existingCompany } = await supabase
-          .from("companies")
-          .select("id")
-          .eq("user_id", user.id)
-          .maybeSingle()
-
-        if (existingCompany) {
-          // Update existing company
-          const { data: company, error } = await supabase
-            .from("companies")
-            .update({
-              name: body.name,
-              cnpj: body.cnpj,
-              phone: body.phone,
-              address: body.address,
-              email: body.email,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("user_id", user.id)
-            .select()
-            .single()
-
-          if (!error && company) {
-            return NextResponse.json(company)
-          }
-        } else {
-          // Create new company
-          const { data: company, error } = await supabase
-            .from("companies")
-            .insert({
-              name: body.name,
-              cnpj: body.cnpj,
-              phone: body.phone,
-              address: body.address,
-              email: body.email,
-              user_id: user.id,
-            })
-            .select()
-            .single()
-
-          if (!error && company) {
-            return NextResponse.json(company)
-          }
-        }
-      }
+    if (!user) {
+      return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 })
     }
 
-    return NextResponse.json({ error: "Erro ao salvar empresa" }, { status: 500 })
+    const companyData = {
+      name: body.name || "",
+      razao_social: body.razao_social || "",
+      cnpj: body.cnpj || "",
+      cpf: body.cpf || "",
+      phone: body.phone || "",
+      whatsapp: body.whatsapp || "",
+      email: body.email || "",
+      site: body.site || "",
+      instagram: body.instagram || "",
+      facebook: body.facebook || "",
+      rua: body.rua || "",
+      numero: body.numero || "",
+      complemento: body.complemento || "",
+      bairro: body.bairro || "",
+      cidade: body.cidade || "",
+      uf: body.uf || "",
+      cep: body.cep || "",
+      horarios: body.horarios || {},
+      tempo_medio_preparo: body.tempo_medio_preparo || "30",
+      retirada_local: body.retirada_local !== false,
+      entrega_propria: body.entrega_propria !== false,
+      entrega_motoboy: body.entrega_motoboy || false,
+      link_cardapio: body.link_cardapio || "",
+      logo_url: body.logo_url || null,
+      photos: body.photos || [],
+      user_id: user.id,
+      updated_at: new Date().toISOString(),
+    }
+
+    const { data: existingCompany } = await supabase.from("companies").select("id").eq("user_id", user.id).maybeSingle()
+
+    if (existingCompany) {
+      const { data: company, error } = await supabase
+        .from("companies")
+        .update(companyData)
+        .eq("user_id", user.id)
+        .select()
+        .maybeSingle()
+
+      if (!error && company) {
+        console.log("[v0] API Companies: Empresa atualizada com sucesso")
+        return NextResponse.json(company)
+      } else {
+        console.error("[v0] API Companies: Erro ao atualizar:", error)
+        return NextResponse.json({ error: "Erro ao atualizar empresa" }, { status: 500 })
+      }
+    } else {
+      const { data: company, error } = await supabase
+        .from("companies")
+        .insert({
+          ...companyData,
+          created_at: new Date().toISOString(),
+        })
+        .select()
+        .maybeSingle()
+
+      if (!error && company) {
+        console.log("[v0] API Companies: Empresa criada com sucesso")
+        return NextResponse.json(company)
+      } else {
+        console.error("[v0] API Companies: Erro ao criar:", error)
+        return NextResponse.json({ error: "Erro ao criar empresa" }, { status: 500 })
+      }
+    }
   } catch (error) {
-    console.error("Erro na API de companies PUT:", error)
+    console.error("[v0] API Companies: Erro interno:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
