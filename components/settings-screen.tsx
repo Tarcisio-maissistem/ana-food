@@ -56,6 +56,12 @@ interface WhatsAppSession {
   error?: string
 }
 
+interface TestMessage {
+  phone: string
+  message: string
+  tags: string
+}
+
 interface EmpresaData {
   id?: string
   name?: string
@@ -128,6 +134,13 @@ const SettingsScreen = () => {
   const [showQrModal, setShowQrModal] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
   const [isCheckingStatus, setIsCheckingStatus] = useState(false)
+
+  const [testMessage, setTestMessage] = useState<TestMessage>({
+    phone: "",
+    message: "",
+    tags: "",
+  })
+  const [isSendingTest, setIsSendingTest] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -420,13 +433,48 @@ const SettingsScreen = () => {
     }
   }
 
-  const createWhatsappSession = async () => {
-    if (!instanceName) {
-      toast.error("CNPJ não configurado. Configure o CNPJ da empresa primeiro.")
+  const sendTestMessage = async () => {
+    if (!testMessage.phone || !testMessage.message) {
+      toast.error("Preencha o telefone e a mensagem")
       return
     }
 
-    await validateAndCreateSession(instanceName)
+    setIsSendingTest(true)
+    try {
+      console.log("[v0] WhatsApp: Enviando mensagem de teste:", testMessage)
+
+      // Processar tags na mensagem
+      let processedMessage = testMessage.message
+      if (testMessage.tags) {
+        const tags = testMessage.tags.split(",").map((tag) => tag.trim())
+        tags.forEach((tag) => {
+          processedMessage = processedMessage.replace(`{${tag}}`, `[${tag.toUpperCase()}]`)
+        })
+      }
+
+      const response = await fetch("/api/whatsapp/send-message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          instanceName: instanceName,
+          phone: testMessage.phone,
+          message: processedMessage,
+        }),
+      })
+
+      if (response.ok) {
+        toast.success("Mensagem de teste enviada com sucesso!")
+        setTestMessage({ phone: "", message: "", tags: "" })
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Erro ao enviar mensagem")
+      }
+    } catch (error: any) {
+      console.error("[v0] WhatsApp: Erro ao enviar teste:", error)
+      toast.error(`Erro ao enviar: ${error.message}`)
+    } finally {
+      setIsSendingTest(false)
+    }
   }
 
   const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -440,6 +488,22 @@ const SettingsScreen = () => {
       toast.success("Foto de perfil atualizada!")
     }
     reader.readAsDataURL(file)
+  }
+
+  const createWhatsappSession = async () => {
+    if (!empresaData?.cnpj) {
+      toast.error("Configure o CNPJ da empresa primeiro")
+      return
+    }
+
+    const cnpjInstance = `whatsapp-${empresaData.cnpj.replace(/[^\d]/g, "")}`
+    setInstanceName(cnpjInstance)
+    setWhatsappSession((prev) => ({
+      ...prev,
+      instanceName: cnpjInstance,
+    }))
+
+    await createNewInstance(cnpjInstance)
   }
 
   useEffect(() => {
@@ -613,7 +677,24 @@ const SettingsScreen = () => {
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                   <div className="flex items-center gap-4">
                     <div>
-                      <p className="font-medium text-gray-900">{getStatusText(whatsappSession.status)}</p>
+                      <div className="flex items-center gap-2 mb-2">
+                        <p className="font-medium text-gray-900">{getStatusText(whatsappSession.status)}</p>
+                        {whatsappSession.status === "open" || whatsappSession.status === "connected" ? (
+                          <Badge variant="secondary" className="bg-green-100 text-green-800">
+                            <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse" />
+                            Online
+                          </Badge>
+                        ) : whatsappSession.status === "connecting" || whatsappSession.status === "qr" ? (
+                          <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                            Conectando
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="bg-red-100 text-red-800">
+                            Desconectado
+                          </Badge>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Clock className="w-3 h-3" />
                         <span>
@@ -622,23 +703,6 @@ const SettingsScreen = () => {
                             : "Nunca atualizado"}
                         </span>
                       </div>
-                      {whatsappSession.status === "connected" && (
-                        <Badge variant="secondary" className="bg-green-100 text-green-800">
-                          <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse" />
-                          Online
-                        </Badge>
-                      )}
-                      {(whatsappSession.status === "connecting" || whatsappSession.status === "qr") && (
-                        <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                          Conectando
-                        </Badge>
-                      )}
-                      {whatsappSession.status === "disconnected" && (
-                        <Badge variant="secondary" className="bg-red-100 text-red-800">
-                          Desconectado
-                        </Badge>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -654,6 +718,68 @@ const SettingsScreen = () => {
                 )}
               </CardContent>
             </Card>
+
+            {whatsappSession.status === "open" || whatsappSession.status === "connected" ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <MessageSquare className="w-5 h-5" />
+                    Teste de Mensagens
+                  </CardTitle>
+                  <CardDescription>Envie mensagens de teste com tags personalizadas</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label htmlFor="test-phone">Telefone (com código do país)</Label>
+                    <Input
+                      id="test-phone"
+                      placeholder="5562999999999"
+                      value={testMessage.phone}
+                      onChange={(e) => setTestMessage((prev) => ({ ...prev, phone: e.target.value }))}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Exemplo: 5562999999999 (Brasil + DDD + número)</p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="test-tags">Tags Disponíveis (separadas por vírgula)</Label>
+                    <Input
+                      id="test-tags"
+                      placeholder="nome, pedido, valor, data"
+                      value={testMessage.tags}
+                      onChange={(e) => setTestMessage((prev) => ({ ...prev, tags: e.target.value }))}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Use {`{nome}`}, {`{pedido}`}, etc. na mensagem
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="test-message">Mensagem de Teste</Label>
+                    <textarea
+                      id="test-message"
+                      className="w-full p-3 border border-gray-300 rounded-md resize-none"
+                      rows={4}
+                      placeholder="Olá {nome}! Seu pedido {pedido} no valor de {valor} está pronto!"
+                      value={testMessage.message}
+                      onChange={(e) => setTestMessage((prev) => ({ ...prev, message: e.target.value }))}
+                    />
+                  </div>
+
+                  <Button
+                    onClick={sendTestMessage}
+                    disabled={isSendingTest || !testMessage.phone || !testMessage.message}
+                    className="w-full"
+                  >
+                    {isSendingTest ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <MessageSquare className="w-4 h-4 mr-2" />
+                    )}
+                    {isSendingTest ? "Enviando..." : "Enviar Teste"}
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : null}
 
             <Card>
               <CardHeader>
