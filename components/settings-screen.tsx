@@ -196,18 +196,24 @@ const SettingsScreen = () => {
         )
 
         if (instanceExists) {
-          console.log("[v0] WhatsApp: Instância já existe, conectando...")
+          console.log("[v0] WhatsApp: Instância já existe, tentando conectar...")
 
-          // Instance exists, connect to it
-          setWhatsappSession((prev) => ({
-            ...prev,
-            status: "connecting",
-            lastUpdate: new Date(),
-            error: undefined,
-          }))
+          try {
+            await connectToExistingInstance()
+            return
+          } catch (connectError) {
+            console.log("[v0] WhatsApp: Falha ao conectar à instância existente, deletando e recriando...")
 
-          await connectToExistingInstance()
-          return
+            try {
+              await deleteExistingInstance(cnpjInstanceName)
+              console.log("[v0] WhatsApp: Instância deletada, criando nova...")
+              await createWhatsappSessionWithCNPJ(cnpjInstanceName)
+              return
+            } catch (deleteError) {
+              console.error("[v0] WhatsApp: Erro ao deletar instância:", deleteError)
+              throw new Error("Falha ao recriar sessão WhatsApp")
+            }
+          }
         }
       }
 
@@ -217,6 +223,36 @@ const SettingsScreen = () => {
       console.error("[v0] WhatsApp: Erro na validação da sessão:", error)
       // If validation fails, try to create (fallback)
       await createWhatsappSessionWithCNPJ(cnpjInstanceName)
+    }
+  }
+
+  const deleteExistingInstance = async (cnpjInstanceName: string) => {
+    try {
+      console.log("[v0] WhatsApp: Deletando instância existente:", cnpjInstanceName)
+
+      const deleteResponse = await fetch("/api/whatsapp/instance", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "delete",
+          instanceName: cnpjInstanceName,
+        }),
+      })
+
+      if (!deleteResponse.ok) {
+        const errorData = await deleteResponse.json()
+        throw new Error(errorData.error || "Erro ao deletar instância")
+      }
+
+      console.log("[v0] WhatsApp: Instância deletada com sucesso")
+
+      // Wait a moment before creating new instance
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+    } catch (error) {
+      console.error("[v0] WhatsApp: Erro ao deletar instância:", error)
+      throw error
     }
   }
 
@@ -254,7 +290,7 @@ const SettingsScreen = () => {
 
           setTimeout(async () => {
             await connectToExistingInstance()
-          }, 3000)
+          }, 5000)
         } catch (parseError) {
           console.error("[v0] WhatsApp: Erro ao fazer parse da resposta:", parseError)
           throw new Error(`Resposta inválida da API: ${responseText}`)
@@ -267,21 +303,22 @@ const SettingsScreen = () => {
           errorMessage = errorData.error || errorMessage
 
           if (errorData.response && errorData.response.includes("already in use")) {
-            console.log("[v0] WhatsApp: Instância já existe (erro 403), conectando à instância existente...")
+            console.log("[v0] WhatsApp: Instância já existe (erro 403), deletando e recriando...")
 
-            setWhatsappSession((prev) => ({
-              ...prev,
-              status: "connecting",
-              lastUpdate: new Date(),
-              error: undefined,
-            }))
+            try {
+              await deleteExistingInstance(cnpjInstanceName)
+              console.log("[v0] WhatsApp: Tentando criar novamente após deletar...")
 
-            // Connect to existing instance instead of creating new one
-            setTimeout(async () => {
-              await connectToExistingInstance()
-            }, 1000)
+              // Recursive call to try creating again after deletion
+              setTimeout(async () => {
+                await createWhatsappSessionWithCNPJ(cnpjInstanceName)
+              }, 3000)
 
-            return // Exit early, don't throw error
+              return // Exit early, don't throw error
+            } catch (deleteError) {
+              console.error("[v0] WhatsApp: Erro ao deletar e recriar:", deleteError)
+              throw new Error("Falha ao recriar sessão WhatsApp após conflito")
+            }
           }
         } catch {
           errorMessage = responseText || errorMessage
