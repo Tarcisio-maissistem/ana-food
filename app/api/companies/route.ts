@@ -16,20 +16,25 @@ export async function GET(request: NextRequest) {
     if (user) {
       console.log("[v0] API Companies: Usuário encontrado:", user.id)
 
-      const { data: allCompanies } = await supabase.from("companies").select("id, name, cnpj, user_id").limit(10)
-      console.log("[v0] API Companies: Empresas existentes no banco:", allCompanies)
-
-      const { data: companiesByCnpj } = await supabase
+      const { data: companyByCnpj } = await supabase
         .from("companies")
-        .select("id, name, cnpj, user_id")
-        .ilike("cnpj", "%12.345.678/0001-99%")
-        .limit(5)
-      console.log("[v0] API Companies: Empresas com CNPJ 12.345.678/0001-99:", companiesByCnpj)
+        .select("*")
+        .or("cnpj.eq.12345678000199,cnpj.eq.12.345.678/0001-99")
+        .maybeSingle()
+
+      if (companyByCnpj) {
+        console.log("[v0] API Companies: Empresa encontrada pelo CNPJ:", {
+          name: companyByCnpj.name,
+          cnpj: companyByCnpj.cnpj,
+          user_id: companyByCnpj.user_id,
+        })
+        return NextResponse.json(companyByCnpj)
+      }
 
       const { data: company, error } = await supabase.from("companies").select("*").eq("user_id", user.id).maybeSingle()
 
       if (!error && company) {
-        console.log("[v0] API Companies: Empresa encontrada:", {
+        console.log("[v0] API Companies: Empresa encontrada por user_id:", {
           name: company.name,
           cnpj: company.cnpj,
           user_id: company.user_id,
