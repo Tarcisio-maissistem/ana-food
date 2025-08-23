@@ -28,6 +28,11 @@ export async function POST(request: NextRequest) {
         }
         console.log("[v0] WhatsApp API: Criando instância com dados:", body)
         break
+      case "fetchInstances":
+        endpoint = "/instance/fetchInstances"
+        method = "GET"
+        console.log("[v0] WhatsApp API: Buscando instâncias existentes")
+        break
       case "connect":
         endpoint = `/instance/connect/${instanceName}`
         method = "GET"
