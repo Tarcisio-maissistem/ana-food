@@ -9,7 +9,24 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Building2, Save, RefreshCw, Upload, ImageIcon, X, Lock, Clock, Truck, MapPin, QrCode } from "lucide-react"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Building2,
+  Save,
+  RefreshCw,
+  Upload,
+  ImageIcon,
+  X,
+  Lock,
+  Clock,
+  Truck,
+  MapPin,
+  QrCode,
+  Plus,
+  Edit,
+  Trash2,
+} from "lucide-react"
 import { formatCNPJ, formatTelefone, type EmpresaData } from "@/utils/cache-empresa"
 import { toast } from "@/components/ui/use-toast"
 
@@ -101,6 +118,15 @@ export function EstabelecimentoScreen() {
     // Cardápio digital
     linkCardapio: "",
   })
+
+  const [paymentMethods, setPaymentMethods] = useState([
+    { id: 1, name: "Dinheiro", type: "com_troco", active: true },
+    { id: 2, name: "Cartão de Crédito", type: "sem_troco", active: true },
+    { id: 3, name: "Cartão de Débito", type: "sem_troco", active: true },
+    { id: 4, name: "PIX", type: "sem_troco", active: true },
+  ])
+  const [editingPayment, setEditingPayment] = useState<any>(null)
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false)
 
   const handleMenuUrlChange = async (newUrl: string) => {
     setFormData((prev) => ({ ...prev, linkCardapio: newUrl }))
@@ -364,8 +390,6 @@ export function EstabelecimentoScreen() {
           tempo_medio_preparo: formData.tempoMedioPreparo,
           retirada_local: formData.retiradaLocal,
           entrega_propria: formData.entregaPropria,
-          entrega_motoboy: formData.entregaMotoboy,
-
           link_cardapio: formData.linkCardapio,
           logo_url: logoUrl,
           photos: photos,
@@ -393,6 +417,48 @@ export function EstabelecimentoScreen() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleAddPayment = () => {
+    setEditingPayment({ name: "", type: "sem_troco", active: true })
+    setShowPaymentDialog(true)
+  }
+
+  const handleEditPayment = (payment: any) => {
+    setEditingPayment(payment)
+    setShowPaymentDialog(true)
+  }
+
+  const handleDeletePayment = (id: number) => {
+    setPaymentMethods((prev) => prev.filter((p) => p.id !== id))
+    toast({
+      title: "Sucesso",
+      description: "Forma de pagamento removida!",
+    })
+  }
+
+  const handleSavePayment = () => {
+    if (!editingPayment?.name) return
+
+    if (editingPayment.id) {
+      // Edit existing
+      setPaymentMethods((prev) => prev.map((p) => (p.id === editingPayment.id ? editingPayment : p)))
+    } else {
+      // Add new
+      const newId = Math.max(...paymentMethods.map((p) => p.id), 0) + 1
+      setPaymentMethods((prev) => [...prev, { ...editingPayment, id: newId }])
+    }
+
+    setShowPaymentDialog(false)
+    setEditingPayment(null)
+    toast({
+      title: "Sucesso",
+      description: "Forma de pagamento salva!",
+    })
+  }
+
+  const togglePaymentActive = (id: number) => {
+    setPaymentMethods((prev) => prev.map((p) => (p.id === id ? { ...p, active: !p.active } : p)))
   }
 
   if (loading) {
@@ -434,7 +500,7 @@ export function EstabelecimentoScreen() {
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="basico">Básico</TabsTrigger>
           <TabsTrigger value="funcionamento">Funcionamento</TabsTrigger>
-          <TabsTrigger value="operacao">Operação</TabsTrigger>
+          <TabsTrigger value="delivery">Delivery</TabsTrigger>
         </TabsList>
 
         <TabsContent value="basico" className="space-y-6">
@@ -524,229 +590,231 @@ export function EstabelecimentoScreen() {
             <div className="lg:col-span-2">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Informações Básicas</CardTitle>
-                  <CardDescription>Dados principais da empresa</CardDescription>
+                  <CardTitle className="text-lg">Informações Básicas com Endereço e Localização</CardTitle>
+                  <CardDescription>Dados principais da empresa e localização</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="md:col-span-2 space-y-2">
-                      <Label htmlFor="nomeFantasia">Nome Fantasia *</Label>
-                      <Input
-                        id="nomeFantasia"
-                        value={formData.nomeFantasia}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, nomeFantasia: e.target.value }))}
-                        placeholder="Nome do restaurante"
-                      />
-                    </div>
+                <CardContent className="space-y-6">
+                  {/* Basic Info Section */}
+                  <div>
+                    <h3 className="font-medium text-gray-900 mb-3">Dados da Empresa</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="md:col-span-2 space-y-2">
+                        <Label htmlFor="nomeFantasia">Nome Fantasia *</Label>
+                        <Input
+                          id="nomeFantasia"
+                          value={formData.nomeFantasia}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, nomeFantasia: e.target.value }))}
+                          placeholder="Nome do restaurante"
+                        />
+                      </div>
 
-                    <div className="md:col-span-2 space-y-2">
-                      <Label htmlFor="razaoSocial">Razão Social</Label>
-                      <Input
-                        id="razaoSocial"
-                        value={formData.razaoSocial}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, razaoSocial: e.target.value }))}
-                        placeholder="Razão social da empresa"
-                      />
-                    </div>
+                      <div className="md:col-span-2 space-y-2">
+                        <Label htmlFor="razaoSocial">Razão Social</Label>
+                        <Input
+                          id="razaoSocial"
+                          value={formData.razaoSocial}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, razaoSocial: e.target.value }))}
+                          placeholder="Razão social da empresa"
+                        />
+                      </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="cnpj" className="flex items-center gap-2">
-                        CNPJ <Lock className="h-3 w-3 text-gray-400" />
-                      </Label>
-                      <Input
-                        id="cnpj"
-                        value={formatCNPJ(formData.cnpj)}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, cnpj: e.target.value.replace(/\D/g, "") }))}
-                        placeholder="00.000.000/0000-00"
-                        maxLength={18}
-                        readOnly
-                        className="bg-gray-50 text-gray-600 cursor-not-allowed"
-                      />
-                    </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="cnpj" className="flex items-center gap-2">
+                          CNPJ <Lock className="h-3 w-3 text-gray-400" />
+                        </Label>
+                        <Input
+                          id="cnpj"
+                          value={formatCNPJ(formData.cnpj)}
+                          onChange={(e) =>
+                            setFormData((prev) => ({ ...prev, cnpj: e.target.value.replace(/\D/g, "") }))
+                          }
+                          placeholder="00.000.000/0000-00"
+                          maxLength={18}
+                          readOnly
+                          className="bg-gray-50 text-gray-600 cursor-not-allowed"
+                        />
+                      </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="cpf">CPF (se pessoa física)</Label>
-                      <Input
-                        id="cpf"
-                        value={formatCPF(formData.cpf)}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, cpf: e.target.value.replace(/\D/g, "") }))}
-                        placeholder="000.000.000-00"
-                        maxLength={14}
-                      />
-                    </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="cpf">CPF (se pessoa física)</Label>
+                        <Input
+                          id="cpf"
+                          value={formatCPF(formData.cpf)}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, cpf: e.target.value.replace(/\D/g, "") }))}
+                          placeholder="000.000.000-00"
+                          maxLength={14}
+                        />
+                      </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="telefone">Telefone *</Label>
-                      <Input
-                        id="telefone"
-                        value={formatTelefone(formData.telefone)}
-                        onChange={(e) =>
-                          setFormData((prev) => ({ ...prev, telefone: e.target.value.replace(/\D/g, "") }))
-                        }
-                        placeholder="(00) 00000-0000"
-                        maxLength={15}
-                      />
-                    </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="telefone">Telefone *</Label>
+                        <Input
+                          id="telefone"
+                          value={formatTelefone(formData.telefone)}
+                          onChange={(e) =>
+                            setFormData((prev) => ({ ...prev, telefone: e.target.value.replace(/\D/g, "") }))
+                          }
+                          placeholder="(00) 00000-0000"
+                          maxLength={15}
+                        />
+                      </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="whatsapp">WhatsApp Oficial</Label>
-                      <Input
-                        id="whatsapp"
-                        value={formatTelefone(formData.whatsapp)}
-                        onChange={(e) =>
-                          setFormData((prev) => ({ ...prev, whatsapp: e.target.value.replace(/\D/g, "") }))
-                        }
-                        placeholder="(00) 00000-0000"
-                        maxLength={15}
-                      />
-                    </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="whatsapp">WhatsApp Oficial</Label>
+                        <Input
+                          id="whatsapp"
+                          value={formatTelefone(formData.whatsapp)}
+                          onChange={(e) =>
+                            setFormData((prev) => ({ ...prev, whatsapp: e.target.value.replace(/\D/g, "") }))
+                          }
+                          placeholder="(00) 00000-0000"
+                          maxLength={15}
+                        />
+                      </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="email">E-mail *</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
-                        placeholder="contato@restaurante.com"
-                      />
-                    </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="email">E-mail *</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={formData.email}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
+                          placeholder="contato@restaurante.com"
+                        />
+                      </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="site">Site/URL</Label>
-                      <Input
-                        id="site"
-                        value={formData.site}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, site: e.target.value }))}
-                        placeholder="https://www.restaurante.com"
-                      />
-                    </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="site">Site/URL</Label>
+                        <Input
+                          id="site"
+                          value={formData.site}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, site: e.target.value }))}
+                          placeholder="https://www.restaurante.com"
+                        />
+                      </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="instagram">Instagram</Label>
-                      <Input
-                        id="instagram"
-                        value={formData.instagram}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, instagram: e.target.value }))}
-                        placeholder="@restaurante"
-                      />
-                    </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="instagram">Instagram</Label>
+                        <Input
+                          id="instagram"
+                          value={formData.instagram}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, instagram: e.target.value }))}
+                          placeholder="@restaurante"
+                        />
+                      </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="facebook">Facebook</Label>
-                      <Input
-                        id="facebook"
-                        value={formData.facebook}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, facebook: e.target.value }))}
-                        placeholder="facebook.com/restaurante"
-                      />
+                      <div className="space-y-2">
+                        <Label htmlFor="facebook">Facebook</Label>
+                        <Input
+                          id="facebook"
+                          value={formData.facebook}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, facebook: e.target.value }))}
+                          placeholder="facebook.com/restaurante"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Address Section */}
+                  <div>
+                    <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      Endereço e Localização
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="md:col-span-2 space-y-2">
+                        <Label htmlFor="rua">Rua/Avenida *</Label>
+                        <Input
+                          id="rua"
+                          value={formData.rua}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, rua: e.target.value }))}
+                          placeholder="Nome da rua ou avenida"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="numero">Número *</Label>
+                        <Input
+                          id="numero"
+                          value={formData.numero}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, numero: e.target.value }))}
+                          placeholder="123"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="complemento">Complemento</Label>
+                        <Input
+                          id="complemento"
+                          value={formData.complemento}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, complemento: e.target.value }))}
+                          placeholder="Apto, sala, loja..."
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="bairro">Bairro *</Label>
+                        <Input
+                          id="bairro"
+                          value={formData.bairro}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, bairro: e.target.value }))}
+                          placeholder="Nome do bairro"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="cidade">Cidade *</Label>
+                        <Input
+                          id="cidade"
+                          value={formData.cidade}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, cidade: e.target.value }))}
+                          placeholder="Nome da cidade"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="uf">UF *</Label>
+                        <Input
+                          id="uf"
+                          value={formData.uf}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, uf: e.target.value.toUpperCase() }))}
+                          placeholder="SP"
+                          maxLength={2}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="cep">CEP *</Label>
+                        <Input
+                          id="cep"
+                          value={formData.cep}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, cep: e.target.value.replace(/\D/g, "") }))}
+                          placeholder="00000-000"
+                          maxLength={9}
+                        />
+                      </div>
+
+                      <div className="md:col-span-3 space-y-2">
+                        <Label htmlFor="locationLink" className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4" />
+                          Link de Localização (Google Maps)
+                        </Label>
+                        <Input
+                          id="locationLink"
+                          value={formData.locationLink}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, locationLink: e.target.value }))}
+                          placeholder="https://maps.google.com/..."
+                        />
+                        <p className="text-xs text-gray-500">
+                          Cole o link do Google Maps para cálculo automático de taxa de entrega por distância
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
           </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <MapPin className="h-5 w-5" />
-                Endereço e Localização
-              </CardTitle>
-              <CardDescription>Localização do estabelecimento para cálculo de entrega</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div className="md:col-span-2 space-y-2">
-                  <Label htmlFor="rua">Rua/Avenida *</Label>
-                  <Input
-                    id="rua"
-                    value={formData.rua}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, rua: e.target.value }))}
-                    placeholder="Nome da rua ou avenida"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="numero">Número *</Label>
-                  <Input
-                    id="numero"
-                    value={formData.numero}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, numero: e.target.value }))}
-                    placeholder="123"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="complemento">Complemento</Label>
-                  <Input
-                    id="complemento"
-                    value={formData.complemento}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, complemento: e.target.value }))}
-                    placeholder="Apto, sala, loja..."
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="bairro">Bairro *</Label>
-                  <Input
-                    id="bairro"
-                    value={formData.bairro}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, bairro: e.target.value }))}
-                    placeholder="Nome do bairro"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="cidade">Cidade *</Label>
-                  <Input
-                    id="cidade"
-                    value={formData.cidade}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, cidade: e.target.value }))}
-                    placeholder="Nome da cidade"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="uf">UF *</Label>
-                  <Input
-                    id="uf"
-                    value={formData.uf}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, uf: e.target.value.toUpperCase() }))}
-                    placeholder="SP"
-                    maxLength={2}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="cep">CEP *</Label>
-                  <Input
-                    id="cep"
-                    value={formData.cep}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, cep: e.target.value.replace(/\D/g, "") }))}
-                    placeholder="00000-000"
-                    maxLength={9}
-                  />
-                </div>
-
-                <div className="md:col-span-3 space-y-2">
-                  <Label htmlFor="locationLink" className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4" />
-                    Link de Localização (Google Maps)
-                  </Label>
-                  <Input
-                    id="locationLink"
-                    value={formData.locationLink}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, locationLink: e.target.value }))}
-                    placeholder="https://maps.google.com/..."
-                  />
-                  <p className="text-xs text-gray-500">
-                    Cole o link do Google Maps para cálculo automático de taxa de entrega por distância
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="funcionamento" className="space-y-6">
@@ -840,7 +908,7 @@ export function EstabelecimentoScreen() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="operacao" className="space-y-6">
+        <TabsContent value="delivery" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
@@ -892,15 +960,65 @@ export function EstabelecimentoScreen() {
                     onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, entregaPropria: checked }))}
                   />
                 </div>
+              </CardContent>
+            </Card>
 
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="entregaMotoboy">Entrega por Motoboy Parceiro</Label>
-                  <Switch
-                    id="entregaMotoboy"
-                    checked={formData.entregaMotoboy}
-                    onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, entregaMotoboy: checked }))}
-                  />
+            <Card className="lg:col-span-2">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg">Formas de Pagamento</CardTitle>
+                  <CardDescription>Configure as formas de pagamento aceitas</CardDescription>
                 </div>
+                <Button onClick={handleAddPayment} size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adicionar
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Ativo</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paymentMethods.map((payment) => (
+                      <TableRow key={payment.id}>
+                        <TableCell className="font-medium">{payment.name}</TableCell>
+                        <TableCell>
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs ${
+                              payment.type === "com_troco" ? "bg-blue-100 text-blue-800" : "bg-green-100 text-green-800"
+                            }`}
+                          >
+                            {payment.type === "com_troco" ? "Com Troco" : "Sem Troco"}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <Switch checked={payment.active} onCheckedChange={() => togglePaymentActive(payment.id)} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button variant="ghost" size="sm" onClick={() => handleEditPayment(payment)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeletePayment(payment.id)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
 
@@ -930,6 +1048,56 @@ export function EstabelecimentoScreen() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {showPaymentDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4">
+            <CardHeader>
+              <CardTitle>{editingPayment?.id ? "Editar" : "Adicionar"} Forma de Pagamento</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="paymentName">Nome</Label>
+                <Input
+                  id="paymentName"
+                  value={editingPayment?.name || ""}
+                  onChange={(e) => setEditingPayment((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="Ex: Cartão de Crédito"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="paymentType">Tipo</Label>
+                <Select
+                  value={editingPayment?.type || "sem_troco"}
+                  onValueChange={(value) => setEditingPayment((prev) => ({ ...prev, type: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="com_troco">Com Troco</SelectItem>
+                    <SelectItem value="sem_troco">Sem Troco</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="paymentActive"
+                  checked={editingPayment?.active || false}
+                  onCheckedChange={(checked) => setEditingPayment((prev) => ({ ...prev, active: checked }))}
+                />
+                <Label htmlFor="paymentActive">Ativo</Label>
+              </div>
+            </CardContent>
+            <div className="flex justify-end gap-2 p-6 pt-0">
+              <Button variant="outline" onClick={() => setShowPaymentDialog(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSavePayment}>Salvar</Button>
+            </div>
+          </Card>
+        </div>
+      )}
 
       <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4 -mx-6">
         <Button
