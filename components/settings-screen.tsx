@@ -172,100 +172,95 @@ const SettingsScreen = () => {
 
   const validateAndCreateSession = async (cnpjInstanceName: string) => {
     try {
-      console.log("[v0] WhatsApp: Validando sessão para instância:", cnpjInstanceName)
+      console.log("[v0] WhatsApp: Iniciando validação robusta para instância:", cnpjInstanceName)
 
-      const checkResponse = await fetch("/api/whatsapp/instance", {
+      // Primeiro, buscar todas as instâncias existentes
+      const instancesResponse = await fetch("/api/whatsapp/instance", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "fetchInstances",
           instanceName: cnpjInstanceName,
         }),
       })
 
-      if (checkResponse.ok) {
-        const instanceData = await checkResponse.json()
-        console.log("[v0] WhatsApp: Instâncias encontradas:", instanceData)
+      if (instancesResponse.ok) {
+        const instances = await instancesResponse.json()
+        console.log("[v0] WhatsApp: Instâncias encontradas:", instances)
 
-        // Check if our instance exists in the list
-        const instanceExists = instanceData.some(
-          (instance: any) =>
-            instance.instanceName === cnpjInstanceName || instance.instance?.instanceName === cnpjInstanceName,
+        // Procurar nossa instância específica na lista
+        const existingInstance = instances.find(
+          (instance: any) => instance.name === cnpjInstanceName || instance.instanceName === cnpjInstanceName,
         )
 
-        if (instanceExists) {
-          console.log("[v0] WhatsApp: Instância já existe, tentando conectar...")
+        if (existingInstance) {
+          console.log("[v0] WhatsApp: Instância encontrada:", existingInstance)
 
+          // Se a instância existe, tentar conectar diretamente
           try {
-            await connectToExistingInstance()
+            await connectToExistingInstance(cnpjInstanceName)
             return
           } catch (connectError) {
-            console.log("[v0] WhatsApp: Falha ao conectar à instância existente, deletando e recriando...")
+            console.log("[v0] WhatsApp: Falha ao conectar, deletando instância corrompida...")
 
-            try {
-              await deleteExistingInstance(cnpjInstanceName)
-              console.log("[v0] WhatsApp: Instância deletada, criando nova...")
-              await createWhatsappSessionWithCNPJ(cnpjInstanceName)
-              return
-            } catch (deleteError) {
-              console.error("[v0] WhatsApp: Erro ao deletar instância:", deleteError)
-              throw new Error("Falha ao recriar sessão WhatsApp")
-            }
+            // Se falhar ao conectar, deletar e recriar
+            await forceDeleteAndRecreate(cnpjInstanceName)
+            return
           }
         }
       }
 
-      console.log("[v0] WhatsApp: Instância não existe, criando nova...")
-      await createWhatsappSessionWithCNPJ(cnpjInstanceName)
+      // Se chegou aqui, a instância não existe - criar nova
+      console.log("[v0] WhatsApp: Instância não encontrada, criando nova...")
+      await createNewInstance(cnpjInstanceName)
     } catch (error) {
-      console.error("[v0] WhatsApp: Erro na validação da sessão:", error)
-      // If validation fails, try to create (fallback)
-      await createWhatsappSessionWithCNPJ(cnpjInstanceName)
+      console.error("[v0] WhatsApp: Erro na validação:", error)
+      // Em caso de erro na validação, tentar criar diretamente
+      await createNewInstance(cnpjInstanceName)
     }
   }
 
-  const deleteExistingInstance = async (cnpjInstanceName: string) => {
+  const forceDeleteAndRecreate = async (cnpjInstanceName: string) => {
     try {
-      console.log("[v0] WhatsApp: Deletando instância existente:", cnpjInstanceName)
+      console.log("[v0] WhatsApp: Forçando deleção da instância:", cnpjInstanceName)
 
+      // Tentar deletar a instância existente
       const deleteResponse = await fetch("/api/whatsapp/instance", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "delete",
           instanceName: cnpjInstanceName,
         }),
       })
 
-      if (!deleteResponse.ok) {
-        const errorData = await deleteResponse.json()
-        throw new Error(errorData.error || "Erro ao deletar instância")
+      if (deleteResponse.ok) {
+        console.log("[v0] WhatsApp: Instância deletada com sucesso")
+
+        // Aguardar um momento para garantir que foi deletada
+        await new Promise((resolve) => setTimeout(resolve, 3000))
+
+        // Criar nova instância
+        await createNewInstance(cnpjInstanceName)
+      } else {
+        console.log("[v0] WhatsApp: Falha ao deletar, tentando criar mesmo assim...")
+        await createNewInstance(cnpjInstanceName)
       }
-
-      console.log("[v0] WhatsApp: Instância deletada com sucesso")
-
-      // Wait a moment before creating new instance
-      await new Promise((resolve) => setTimeout(resolve, 2000))
     } catch (error) {
-      console.error("[v0] WhatsApp: Erro ao deletar instância:", error)
+      console.error("[v0] WhatsApp: Erro ao deletar e recriar:", error)
       throw error
     }
   }
 
-  const createWhatsappSessionWithCNPJ = async (cnpjInstanceName: string) => {
+  const createNewInstance = async (cnpjInstanceName: string) => {
     setIsConnecting(true)
+
     try {
-      console.log("[v0] WhatsApp: Criando sessão com CNPJ:", cnpjInstanceName)
+      console.log("[v0] WhatsApp: Criando nova instância:", cnpjInstanceName)
 
       const createResponse = await fetch("/api/whatsapp/instance", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "create",
           instanceName: cnpjInstanceName,
@@ -273,153 +268,103 @@ const SettingsScreen = () => {
       })
 
       const responseText = await createResponse.text()
-      console.log("[v0] WhatsApp: Response status:", createResponse.status)
-      console.log("[v0] WhatsApp: Response text:", responseText)
+      console.log("[v0] WhatsApp: Resposta da criação:", createResponse.status, responseText)
 
       if (createResponse.ok) {
-        try {
-          const createData = JSON.parse(responseText)
-          console.log("[v0] WhatsApp: Instância criada com sucesso:", createData)
+        const createData = JSON.parse(responseText)
+        console.log("[v0] WhatsApp: Instância criada com sucesso:", createData)
 
-          setWhatsappSession((prev) => ({
-            ...prev,
-            status: "connecting",
-            lastUpdate: new Date(),
-            error: undefined,
-          }))
+        setWhatsappSession((prev) => ({
+          ...prev,
+          status: "connecting",
+          lastUpdate: new Date(),
+          error: undefined,
+        }))
 
-          setTimeout(async () => {
-            await connectToExistingInstance()
-          }, 5000)
-        } catch (parseError) {
-          console.error("[v0] WhatsApp: Erro ao fazer parse da resposta:", parseError)
-          throw new Error(`Resposta inválida da API: ${responseText}`)
-        }
+        // Aguardar um momento e tentar conectar
+        setTimeout(async () => {
+          await connectToExistingInstance(cnpjInstanceName)
+        }, 5000)
+      } else if (createResponse.status === 403 && responseText.includes("already in use")) {
+        console.log("[v0] WhatsApp: Instância já existe (403), forçando deleção e recriação...")
+
+        // Se receber 403 "already in use", forçar deleção e tentar novamente
+        await forceDeleteAndRecreate(cnpjInstanceName)
       } else {
+        // Outros erros
         let errorMessage = "Erro ao criar instância WhatsApp"
 
         try {
           const errorData = JSON.parse(responseText)
           errorMessage = errorData.error || errorMessage
-
-          if (errorData.response && errorData.response.includes("already in use")) {
-            console.log("[v0] WhatsApp: Instância já existe (erro 403), deletando e recriando...")
-
-            try {
-              await deleteExistingInstance(cnpjInstanceName)
-              console.log("[v0] WhatsApp: Tentando criar novamente após deletar...")
-
-              // Recursive call to try creating again after deletion
-              setTimeout(async () => {
-                await createWhatsappSessionWithCNPJ(cnpjInstanceName)
-              }, 3000)
-
-              return // Exit early, don't throw error
-            } catch (deleteError) {
-              console.error("[v0] WhatsApp: Erro ao deletar e recriar:", deleteError)
-              throw new Error("Falha ao recriar sessão WhatsApp após conflito")
-            }
-          }
         } catch {
           errorMessage = responseText || errorMessage
         }
 
         if (createResponse.status === 401) {
-          errorMessage = "Erro de autenticação: Verifique a configuração da API Key do Evolution API"
+          errorMessage = "Erro de autenticação: Verifique a configuração da API Key"
         } else if (createResponse.status === 404) {
-          errorMessage = "Endpoint não encontrado: Verifique se o Evolution API está rodando"
-        } else if (createResponse.status >= 500) {
-          errorMessage = "Erro no servidor Evolution API: Tente novamente em alguns minutos"
+          errorMessage = "Evolution API não encontrado: Verifique se está rodando"
         }
-
-        console.error("[v0] WhatsApp: Erro detalhado:", {
-          status: createResponse.status,
-          statusText: createResponse.statusText,
-          response: responseText,
-          errorMessage,
-        })
 
         throw new Error(errorMessage)
       }
     } catch (error: any) {
-      console.error("[v0] WhatsApp: Erro ao criar sessão:", error)
-
-      let userMessage = error.message
-      if (error.message.includes("fetch")) {
-        userMessage = "Erro de conexão: Verifique sua conexão com a internet"
-      } else if (error.message.includes("API Key")) {
-        userMessage = "Erro de configuração: Entre em contato com o suporte técnico"
-      }
+      console.error("[v0] WhatsApp: Erro ao criar instância:", error)
 
       setWhatsappSession((prev) => ({
         ...prev,
         status: "disconnected",
-        error: userMessage,
+        error: error.message,
         lastUpdate: new Date(),
       }))
 
-      toast.error(`Erro ao criar sessão WhatsApp: ${userMessage}`)
+      toast.error(`Erro ao criar sessão WhatsApp: ${error.message}`)
     } finally {
       setIsConnecting(false)
     }
   }
 
-  const callWhatsAppAPI = async (action: string, data?: any) => {
-    const currentInstanceName = data?.instanceName || instanceName || whatsappSession.instanceName
-
-    console.log("[v0] WhatsApp: Chamando API com ação:", action, "instância:", currentInstanceName)
-
-    const response = await fetch("/api/whatsapp/instance", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        action,
-        instanceName: currentInstanceName,
-        ...data,
-      }),
-    })
-
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || "Erro na API")
-    }
-
-    return response.json()
-  }
-
-  const connectToExistingInstance = async () => {
+  const connectToExistingInstance = async (instanceName?: string) => {
     try {
       const currentInstanceName = instanceName || whatsappSession.instanceName
       if (!currentInstanceName) {
         throw new Error("Nome da instância não definido")
       }
 
-      console.log("[v0] WhatsApp: Conectando à instância:", currentInstanceName)
+      console.log("[v0] WhatsApp: Conectando à instância existente:", currentInstanceName)
 
-      const connectResponse = await callWhatsAppAPI("connect", { instanceName: currentInstanceName })
+      const connectResponse = await fetch("/api/whatsapp/instance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "connect",
+          instanceName: currentInstanceName,
+        }),
+      })
 
-      console.log("Resposta da conexão:", connectResponse)
+      if (!connectResponse.ok) {
+        const errorText = await connectResponse.text()
+        throw new Error(`Erro ${connectResponse.status}: ${errorText}`)
+      }
 
+      const connectData = await connectResponse.json()
+      console.log("[v0] WhatsApp: Resposta da conexão:", connectData)
+
+      // Processar QR Code se disponível
       let qrCodeData = null
-
-      if (connectResponse.base64) {
-        if (connectResponse.base64.startsWith("data:image")) {
-          qrCodeData = connectResponse.base64
-        } else {
-          qrCodeData = `data:image/png;base64,${connectResponse.base64}`
-        }
-      } else if (connectResponse.qrcode) {
-        if (connectResponse.qrcode.startsWith("data:image")) {
-          qrCodeData = connectResponse.qrcode
-        } else {
-          qrCodeData = `data:image/png;base64,${connectResponse.qrcode}`
-        }
+      if (connectData.base64) {
+        qrCodeData = connectData.base64.startsWith("data:image")
+          ? connectData.base64
+          : `data:image/png;base64,${connectData.base64}`
+      } else if (connectData.qrcode) {
+        qrCodeData = connectData.qrcode.startsWith("data:image")
+          ? connectData.qrcode
+          : `data:image/png;base64,${connectData.qrcode}`
       }
 
       if (qrCodeData) {
-        console.log("QR Code processado:", qrCodeData.substring(0, 50) + "...")
+        console.log("[v0] WhatsApp: QR Code obtido com sucesso")
         setWhatsappSession((prev) => ({
           ...prev,
           status: "qr",
@@ -429,15 +374,12 @@ const SettingsScreen = () => {
         }))
         setShowQrModal(true)
       } else {
+        // Se não há QR Code, verificar status
         await checkWhatsappStatus()
       }
     } catch (error: any) {
-      console.error("Erro ao conectar:", error)
-      setWhatsappSession((prev) => ({
-        ...prev,
-        error: error.message,
-        lastUpdate: new Date(),
-      }))
+      console.error("[v0] WhatsApp: Erro ao conectar à instância:", error)
+      throw error
     }
   }
 
@@ -480,11 +422,11 @@ const SettingsScreen = () => {
 
   const createWhatsappSession = async () => {
     if (!instanceName) {
-      alert("CNPJ não configurado. Configure o CNPJ da empresa primeiro.")
+      toast.error("CNPJ não configurado. Configure o CNPJ da empresa primeiro.")
       return
     }
 
-    await createWhatsappSessionWithCNPJ(instanceName)
+    await validateAndCreateSession(instanceName)
   }
 
   const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
