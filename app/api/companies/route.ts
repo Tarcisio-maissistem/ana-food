@@ -16,14 +16,43 @@ export async function GET(request: NextRequest) {
     if (user) {
       console.log("[v0] API Companies: Usuário encontrado:", user.id)
 
-      const { data: company, error } = await supabase.from("companies").select("*").eq("user_id", user.id).maybeSingle()
+      let company = null
+      let error = null
 
-      if (!error && company) {
-        console.log("[v0] API Companies: Empresa encontrada:", company.name)
+      // First try with user_id
+      const result1 = await supabase.from("companies").select("*").eq("user_id", user.id).maybeSingle()
+      if (!result1.error && result1.data) {
+        company = result1.data
+        console.log("[v0] API Companies: Empresa encontrada via user_id:", company.name)
+      } else {
+        console.log("[v0] API Companies: Nenhuma empresa encontrada via user_id, tentando id_user...")
+
+        // Try with id_user
+        const result2 = await supabase.from("companies").select("*").eq("id_user", user.id).maybeSingle()
+        if (!result2.error && result2.data) {
+          company = result2.data
+          console.log("[v0] API Companies: Empresa encontrada via id_user:", company.name)
+        } else {
+          console.log("[v0] API Companies: Nenhuma empresa encontrada via id_user")
+          error = result2.error
+        }
+      }
+
+      if (company) {
+        console.log("[v0] API Companies: Retornando dados da empresa:", {
+          name: company.name,
+          cnpj: company.cnpj,
+          hasData: !!company.cnpj,
+        })
         return NextResponse.json(company)
       } else {
         console.log("[v0] API Companies: Nenhuma empresa encontrada para o usuário")
+        if (error) {
+          console.error("[v0] API Companies: Erro na consulta:", error)
+        }
       }
+    } else {
+      console.log("[v0] API Companies: Usuário não encontrado para email:", userEmail)
     }
 
     return NextResponse.json({
@@ -116,7 +145,8 @@ export async function PUT(request: NextRequest) {
       link_cardapio: body.link_cardapio || "",
       logo_url: body.logo_url || null,
       photos: body.photos || [],
-      user_id: user.id,
+      ...(availableColumns.includes("user_id") ? { user_id: user.id } : {}),
+      ...(availableColumns.includes("id_user") ? { id_user: user.id } : {}),
       updated_at: new Date().toISOString(),
     }
 
@@ -129,15 +159,21 @@ export async function PUT(request: NextRequest) {
       }
     })
 
-    const { data: existingCompany } = await supabase.from("companies").select("id").eq("user_id", user.id).maybeSingle()
+    let existingCompany = null
+    if (availableColumns.includes("user_id")) {
+      const result = await supabase.from("companies").select("id").eq("user_id", user.id).maybeSingle()
+      existingCompany = result.data
+    } else if (availableColumns.includes("id_user")) {
+      const result = await supabase.from("companies").select("id").eq("id_user", user.id).maybeSingle()
+      existingCompany = result.data
+    }
 
     if (existingCompany) {
-      const { data: company, error } = await supabase
-        .from("companies")
-        .update(companyData)
-        .eq("user_id", user.id)
-        .select()
-        .maybeSingle()
+      const updateQuery = availableColumns.includes("user_id")
+        ? supabase.from("companies").update(companyData).eq("user_id", user.id)
+        : supabase.from("companies").update(companyData).eq("id_user", user.id)
+
+      const { data: company, error } = await updateQuery.select().maybeSingle()
 
       if (!error && company) {
         console.log("[v0] API Companies: Empresa atualizada com sucesso")
