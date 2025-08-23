@@ -174,40 +174,48 @@ const SettingsScreen = () => {
     try {
       console.log("[v0] WhatsApp: Validando sessão para instância:", cnpjInstanceName)
 
-      const statusResponse = await fetch(`/api/whatsapp/status?instance=${cnpjInstanceName}`)
+      const checkResponse = await fetch("/api/whatsapp/instance", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "fetchInstances",
+          instanceName: cnpjInstanceName,
+        }),
+      })
 
-      if (statusResponse.ok) {
-        const statusData = await statusResponse.json()
-        const connectionState = statusData.instance?.state || "close"
+      if (checkResponse.ok) {
+        const instanceData = await checkResponse.json()
+        console.log("[v0] WhatsApp: Instâncias encontradas:", instanceData)
 
-        console.log("[v0] WhatsApp: Status da sessão existente:", connectionState)
+        // Check if our instance exists in the list
+        const instanceExists = instanceData.some(
+          (instance: any) =>
+            instance.instanceName === cnpjInstanceName || instance.instance?.instanceName === cnpjInstanceName,
+        )
 
-        if (connectionState === "open") {
+        if (instanceExists) {
+          console.log("[v0] WhatsApp: Instância já existe, conectando...")
+
+          // Instance exists, connect to it
           setWhatsappSession((prev) => ({
             ...prev,
-            status: "connected",
+            status: "connecting",
             lastUpdate: new Date(),
             error: undefined,
           }))
-          console.log("[v0] WhatsApp: Sessão já conectada")
-        } else if (connectionState === "connecting" || connectionState === "qr") {
-          setWhatsappSession((prev) => ({
-            ...prev,
-            status: connectionState,
-            lastUpdate: new Date(),
-          }))
-          console.log("[v0] WhatsApp: Sessão existe mas precisa de QR code")
+
           await connectToExistingInstance()
-        } else {
-          console.log("[v0] WhatsApp: Sessão não existe ou desconectada, criando nova...")
-          await createWhatsappSessionWithCNPJ(cnpjInstanceName)
+          return
         }
-      } else {
-        console.log("[v0] WhatsApp: Erro ao verificar status ou sessão não existe, criando nova...")
-        await createWhatsappSessionWithCNPJ(cnpjInstanceName)
       }
+
+      console.log("[v0] WhatsApp: Instância não existe, criando nova...")
+      await createWhatsappSessionWithCNPJ(cnpjInstanceName)
     } catch (error) {
       console.error("[v0] WhatsApp: Erro na validação da sessão:", error)
+      // If validation fails, try to create (fallback)
       await createWhatsappSessionWithCNPJ(cnpjInstanceName)
     }
   }
@@ -259,7 +267,7 @@ const SettingsScreen = () => {
           errorMessage = errorData.error || errorMessage
 
           if (errorData.response && errorData.response.includes("already in use")) {
-            console.log("[v0] WhatsApp: Instância já existe, conectando à instância existente...")
+            console.log("[v0] WhatsApp: Instância já existe (erro 403), conectando à instância existente...")
 
             setWhatsappSession((prev) => ({
               ...prev,
@@ -688,7 +696,7 @@ const SettingsScreen = () => {
                   <div className="space-y-4">
                     <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                       <div className="flex items-center gap-2 text-blue-800">
-                        <MessageSquare className="w-4 h-4" />
+                        <MessageSquare className="w-4 h-4 mr-2" />
                         <span className="font-medium">Instância WhatsApp</span>
                       </div>
                       <p className="text-sm text-blue-700 mt-1">
