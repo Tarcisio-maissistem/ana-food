@@ -228,24 +228,74 @@ const SettingsScreen = () => {
         }),
       })
 
-      if (createResponse.ok) {
-        const createData = await createResponse.json()
-        console.log("[v0] WhatsApp: Instância criada:", createData)
+      const responseText = await createResponse.text()
+      console.log("[v0] WhatsApp: Response status:", createResponse.status)
+      console.log("[v0] WhatsApp: Response text:", responseText)
 
-        setTimeout(async () => {
-          await connectToExistingInstance()
-        }, 2000)
+      if (createResponse.ok) {
+        try {
+          const createData = JSON.parse(responseText)
+          console.log("[v0] WhatsApp: Instância criada com sucesso:", createData)
+
+          setWhatsappSession((prev) => ({
+            ...prev,
+            status: "connecting",
+            lastUpdate: new Date(),
+            error: undefined,
+          }))
+
+          setTimeout(async () => {
+            await connectToExistingInstance()
+          }, 3000)
+        } catch (parseError) {
+          console.error("[v0] WhatsApp: Erro ao fazer parse da resposta:", parseError)
+          throw new Error(`Resposta inválida da API: ${responseText}`)
+        }
       } else {
-        throw new Error("Erro ao criar instância WhatsApp")
+        let errorMessage = "Erro ao criar instância WhatsApp"
+
+        try {
+          const errorData = JSON.parse(responseText)
+          errorMessage = errorData.error || errorMessage
+        } catch {
+          errorMessage = responseText || errorMessage
+        }
+
+        if (createResponse.status === 401) {
+          errorMessage = "Erro de autenticação: Verifique a configuração da API Key do Evolution API"
+        } else if (createResponse.status === 404) {
+          errorMessage = "Endpoint não encontrado: Verifique se o Evolution API está rodando"
+        } else if (createResponse.status >= 500) {
+          errorMessage = "Erro no servidor Evolution API: Tente novamente em alguns minutos"
+        }
+
+        console.error("[v0] WhatsApp: Erro detalhado:", {
+          status: createResponse.status,
+          statusText: createResponse.statusText,
+          response: responseText,
+          errorMessage,
+        })
+
+        throw new Error(errorMessage)
       }
     } catch (error: any) {
       console.error("[v0] WhatsApp: Erro ao criar sessão:", error)
+
+      let userMessage = error.message
+      if (error.message.includes("fetch")) {
+        userMessage = "Erro de conexão: Verifique sua conexão com a internet"
+      } else if (error.message.includes("API Key")) {
+        userMessage = "Erro de configuração: Entre em contato com o suporte técnico"
+      }
+
       setWhatsappSession((prev) => ({
         ...prev,
         status: "disconnected",
-        error: error.message,
+        error: userMessage,
         lastUpdate: new Date(),
       }))
+
+      toast.error(`Erro ao criar sessão WhatsApp: ${userMessage}`)
     } finally {
       setIsConnecting(false)
     }
