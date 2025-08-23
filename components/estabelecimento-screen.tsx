@@ -9,23 +9,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  Building2,
-  Save,
-  RefreshCw,
-  Upload,
-  ImageIcon,
-  X,
-  Lock,
-  Clock,
-  Truck,
-  MapPin,
-  Camera,
-  QrCode,
-} from "lucide-react"
+import { Building2, Save, RefreshCw, Upload, ImageIcon, X, Lock, Clock, Truck, MapPin, QrCode } from "lucide-react"
 import { formatCNPJ, formatTelefone, type EmpresaData } from "@/utils/cache-empresa"
 import { toast } from "@/components/ui/use-toast"
-import { PaymentMethodsScreen } from "@/components/payment-methods-screen"
 
 const formatCPF = (cpf: string) => {
   if (!cpf) return ""
@@ -445,12 +431,10 @@ export function EstabelecimentoScreen() {
       </div>
 
       <Tabs defaultValue="basico" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="basico">Básico</TabsTrigger>
           <TabsTrigger value="funcionamento">Funcionamento</TabsTrigger>
           <TabsTrigger value="operacao">Operação</TabsTrigger>
-          <TabsTrigger value="pagamentos">Pagamentos</TabsTrigger>
-          <TabsTrigger value="midia">Mídia</TabsTrigger>
         </TabsList>
 
         <TabsContent value="basico" className="space-y-6">
@@ -944,81 +928,6 @@ export function EstabelecimentoScreen() {
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
-
-        <TabsContent value="pagamentos" className="space-y-6">
-          <PaymentMethodsScreen user={user} />
-        </TabsContent>
-
-        <TabsContent value="midia" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Camera className="h-5 w-5" />
-                Fotos do Estabelecimento
-              </CardTitle>
-              <CardDescription>Adicione fotos da fachada, ambiente e produtos (máx. 5 fotos)</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                {photos.map((photo, index) => (
-                  <div key={index} className="relative group">
-                    <img
-                      src={photo || "/placeholder.svg"}
-                      alt={`Foto ${index + 1}`}
-                      className="w-full h-32 object-cover rounded-lg border"
-                    />
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => handleRemovePhoto(index)}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ))}
-
-                {photos.length < 5 && (
-                  <div
-                    className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
-                    onClick={() => photosInputRef.current?.click()}
-                  >
-                    <Camera className="h-6 w-6 text-gray-400 mb-1" />
-                    <p className="text-xs text-gray-500 text-center">Adicionar Foto</p>
-                  </div>
-                )}
-              </div>
-
-              <Button
-                variant="outline"
-                onClick={() => photosInputRef.current?.click()}
-                disabled={uploadingPhotos || photos.length >= 5}
-                className="w-full"
-              >
-                {uploadingPhotos ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    Enviando...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Adicionar Fotos ({photos.length}/5)
-                  </>
-                )}
-              </Button>
-
-              <input
-                ref={photosInputRef}
-                type="file"
-                accept="image/jpeg,image/jpg,image/png,image/webp"
-                multiple
-                onChange={handlePhotosUpload}
-                className="hidden"
-              />
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
 
