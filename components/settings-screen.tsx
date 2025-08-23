@@ -403,11 +403,18 @@ const SettingsScreen = () => {
     try {
       console.log("Verificando status do WhatsApp...")
 
-      const response = await fetch(`/api/whatsapp/status?instance=${instanceName}`)
+      const currentInstanceName = whatsappSession.instanceName || instanceName
+      if (!currentInstanceName) {
+        throw new Error("Nome da instância não definido")
+      }
+
+      console.log("[v0] WhatsApp: Verificando status para instância:", currentInstanceName)
+
+      const response = await fetch(`/api/whatsapp/status?instance=${currentInstanceName}`)
 
       if (response.ok) {
         const data = await response.json()
-        console.log("Status recebido:", data)
+        console.log("[v0] WhatsApp: Status recebido:", data)
 
         const connectionState = data.instance?.state || "close"
 
@@ -422,7 +429,7 @@ const SettingsScreen = () => {
         throw new Error(`Erro ${response.status}`)
       }
     } catch (error: any) {
-      console.error("Erro ao verificar status:", error)
+      console.error("[v0] WhatsApp: Erro ao verificar status:", error)
       setWhatsappSession((prev) => ({
         ...prev,
         error: error.message,
@@ -790,7 +797,7 @@ const SettingsScreen = () => {
                 {!empresaData?.cnpj ? (
                   <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                     <div className="flex items-center gap-2 text-yellow-800">
-                      <AlertTriangle className="w-4 h-4" />
+                      <AlertTriangle className="w-4 h-4 mr-2" />
                       <span className="font-medium">⚠️ CNPJ não configurado</span>
                     </div>
                     <p className="text-sm text-yellow-700 mt-1">
