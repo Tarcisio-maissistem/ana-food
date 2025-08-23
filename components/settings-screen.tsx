@@ -685,7 +685,7 @@ const SettingsScreen = () => {
                   <div className="flex items-center gap-4">
                     <div>
                       <div className="flex items-center gap-2 mb-2">
-                        <p className="font-medium text-gray-900">{getStatusText(whatsappSession.status)}</p>
+                        
                         {whatsappSession.status === "open" || whatsappSession.status === "connected" ? (
                           <Badge variant="secondary" className="bg-green-100 text-green-800">
                             <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse" />
