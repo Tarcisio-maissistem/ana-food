@@ -388,7 +388,7 @@ const SettingsScreen = () => {
         setShowQrModal(true)
       } else {
         // Se não há QR Code, verificar status
-        await checkWhatsappStatus()
+        await checkWhatsappStatus(currentInstanceName)
       }
     } catch (error: any) {
       console.error("[v0] WhatsApp: Erro ao conectar à instância:", error)
@@ -396,14 +396,14 @@ const SettingsScreen = () => {
     }
   }
 
-  const checkWhatsappStatus = async () => {
+  const checkWhatsappStatus = async (instanceNameParam?: string) => {
     if (isCheckingStatus) return
 
     setIsCheckingStatus(true)
     try {
       console.log("Verificando status do WhatsApp...")
 
-      const currentInstanceName = whatsappSession.instanceName || instanceName
+      const currentInstanceName = instanceNameParam || whatsappSession.instanceName || instanceName
       if (!currentInstanceName) {
         throw new Error("Nome da instância não definido")
       }
