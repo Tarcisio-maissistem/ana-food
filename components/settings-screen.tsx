@@ -29,7 +29,7 @@ import {
 import { toast } from "react-hot-toast"
 import { useUser } from "./main-dashboard"
 import { EstabelecimentoScreen } from "./estabelecimento-screen"
-import { getEmpresa, getInstanceName, type EmpresaData } from "@/utils/cache-empresa"
+import { getInstanceName, type EmpresaData } from "@/utils/cache-empresa"
 import { callEvolutionAPI } from "@/utils/api" // Import callEvolutionAPI
 
 interface EstablishmentData {
@@ -229,30 +229,53 @@ const SettingsScreen = () => {
 
   const [isDarkMode, setIsDarkMode] = useState(false)
 
-  useEffect(() => {
-    loadEmpresaData()
-  }, [])
-
   const loadEmpresaData = async () => {
     try {
-      const data = await getEmpresa()
-      if (data) {
-        setEmpresaData(data)
-        const newInstanceName = getInstanceName(data.cnpj)
-        setInstanceName(newInstanceName)
-        setWhatsappSession((prev) => ({
-          ...prev,
-          instanceName: newInstanceName,
-        }))
+      console.log("[v0] Settings: Carregando dados da empresa...")
+      const response = await fetch("/api/companies", {
+        headers: {
+          "x-user-email": user?.email || "",
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        console.log("[v0] Settings: Dados da empresa recebidos:", data)
+
+        if (data && data.cnpj) {
+          const empresaFormatted = {
+            cnpj: data.cnpj,
+            name: data.name,
+            phone: data.phone,
+            email: data.email,
+          }
+          setEmpresaData(empresaFormatted)
+          console.log("[v0] Settings: CNPJ encontrado:", data.cnpj)
+
+          const newInstanceName = getInstanceName(data.cnpj)
+          setInstanceName(newInstanceName)
+          setWhatsappSession((prev) => ({
+            ...prev,
+            instanceName: newInstanceName,
+          }))
+        } else {
+          console.log("[v0] Settings: CNPJ não encontrado nos dados")
+        }
+      } else {
+        console.error("[v0] Settings: Erro na resposta da API:", response.status)
       }
     } catch (error) {
-      console.error("Erro ao carregar dados da empresa:", error)
+      console.error("[v0] Settings: Erro ao carregar dados da empresa:", error)
     }
   }
 
   const checkInstanceStatus = async () => {
     // Implement checkInstanceStatus logic here
   }
+
+  useEffect(() => {
+    loadEmpresaData()
+  }, [])
 
   useEffect(() => {
     if (apiKey && instanceName !== "ana-food-instance") {
