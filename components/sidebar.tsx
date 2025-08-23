@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { ShoppingCart, Package, Users, Printer, Settings, ChefHat, X, FolderOpen, Plus } from "lucide-react"
+import { ShoppingCart, Package, Users, Settings, ChefHat, X } from "lucide-react"
 import type { Screen } from "./main-dashboard"
 import { useUser } from "./main-dashboard"
 import { useState, useEffect } from "react"
@@ -19,10 +19,7 @@ interface SidebarProps {
 const menuItems = [
   { id: "pedidos" as Screen, label: "Pedidos", icon: ShoppingCart },
   { id: "produtos" as Screen, label: "Produtos", icon: Package },
-  { id: "categorias" as Screen, label: "Categorias", icon: FolderOpen },
-  { id: "adicionais" as Screen, label: "Adicionais", icon: Plus },
   { id: "clientes" as Screen, label: "Clientes", icon: Users },
-  { id: "impressoras" as Screen, label: "Impressoras", icon: Printer },
   { id: "configuracoes" as Screen, label: "Configurações", icon: Settings },
 ]
 
