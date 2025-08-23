@@ -24,6 +24,8 @@ import {
   QrCode,
 } from "lucide-react"
 import { formatCNPJ, formatTelefone, type EmpresaData } from "@/utils/cache-empresa"
+import { toast } from "@/components/ui/use-toast"
+import { PaymentMethodsScreen } from "@/components/payment-methods-screen"
 
 const formatCPF = (cpf: string) => {
   if (!cpf) return ""
@@ -33,6 +35,27 @@ const formatCPF = (cpf: string) => {
     return `${match[1]}.${match[2]}.${match[3]}-${match[4]}`
   }
   return cleaned
+}
+
+const validateMenuUrl = async (url: string): Promise<{ isValid: boolean; suggestion?: string }> => {
+  if (!url.trim()) return { isValid: true }
+
+  try {
+    const response = await fetch("/api/validate-menu-url", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-user-email": "tarcisiorp16@gmail.com" || "",
+      },
+      body: JSON.stringify({ url: url.trim() }),
+    })
+
+    const result = await response.json()
+    return result
+  } catch (error) {
+    console.error("[v0] EstabelecimentoScreen: Erro ao validar URL:", error)
+    return { isValid: true }
+  }
 }
 
 export function EstabelecimentoScreen() {
@@ -45,6 +68,7 @@ export function EstabelecimentoScreen() {
   const [photos, setPhotos] = useState<string[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const photosInputRef = useRef<HTMLInputElement>(null)
+  const user = { email: "tarcisiorp16@gmail.com" }
 
   const BUCKET_NAME = "avatars"
 
@@ -91,6 +115,21 @@ export function EstabelecimentoScreen() {
     // Cardápio digital
     linkCardapio: "",
   })
+
+  const handleMenuUrlChange = async (newUrl: string) => {
+    setFormData((prev) => ({ ...prev, linkCardapio: newUrl }))
+
+    if (newUrl.trim()) {
+      const validation = await validateMenuUrl(newUrl)
+      if (!validation.isValid && validation.suggestion) {
+        toast({
+          title: "URL já existe",
+          description: `Esta URL já está em uso. Sugestão: ${validation.suggestion}`,
+          variant: "destructive",
+        })
+      }
+    }
+  }
 
   useEffect(() => {
     console.log("[v0] EstabelecimentoScreen: Componente montado, iniciando carregamento")
@@ -169,8 +208,7 @@ export function EstabelecimentoScreen() {
       }
     } catch (error) {
       console.error("[v0] EstabelecimentoScreen: Erro ao carregar dados da empresa:", error)
-      // @ts-ignore
-      window.showToast?.({
+      toast({
         type: "error",
         title: "Erro",
         description: "Erro ao carregar dados da empresa",
@@ -285,16 +323,14 @@ export function EstabelecimentoScreen() {
         photosInputRef.current.value = ""
       }
 
-      // @ts-ignore
-      window.showToast?.({
+      toast({
         type: "success",
         title: "Sucesso",
         description: `${newPhotos.length} foto(s) adicionada(s)!`,
       })
     } catch (error) {
       console.error("Erro ao fazer upload das fotos:", error)
-      // @ts-ignore
-      window.showToast?.({
+      toast({
         type: "error",
         title: "Erro",
         description: "Erro ao fazer upload das fotos",
@@ -353,8 +389,7 @@ export function EstabelecimentoScreen() {
       if (response.ok) {
         const updated = await response.json()
         setEmpresa(updated)
-        // @ts-ignore
-        window.showToast?.({
+        toast({
           type: "success",
           title: "Sucesso",
           description: "Dados da empresa salvos com sucesso!",
@@ -364,8 +399,7 @@ export function EstabelecimentoScreen() {
       }
     } catch (error) {
       console.error("Erro ao salvar dados da empresa:", error)
-      // @ts-ignore
-      window.showToast?.({
+      toast({
         type: "error",
         title: "Erro",
         description: "Erro ao salvar dados da empresa",
@@ -895,17 +929,17 @@ export function EstabelecimentoScreen() {
                 <CardDescription>Link para compartilhamento do cardápio</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  <Label htmlFor="linkCardapio">Link do Cardápio Digital</Label>
-                  <Input
-                    id="linkCardapio"
-                    value={formData.linkCardapio}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, linkCardapio: e.target.value }))}
-                    placeholder="https://cardapio.restaurante.com"
-                  />
-                  <p className="text-xs text-gray-500">
-                    Este link será usado para compartilhar o cardápio com os clientes
-                  </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="linkCardapio">Link do Cardápio Digital</Label>
+                    <Input
+                      id="linkCardapio"
+                      value={formData.linkCardapio}
+                      onChange={(e) => handleMenuUrlChange(e.target.value)}
+                      placeholder="Ex: meurestaurante"
+                    />
+                    <p className="text-sm text-muted-foreground mt-1">URL única para seu cardápio digital</p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -913,81 +947,7 @@ export function EstabelecimentoScreen() {
         </TabsContent>
 
         <TabsContent value="pagamentos" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Formas de Pagamento</CardTitle>
-              <CardDescription>Configure as formas de pagamento aceitas pelo estabelecimento</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <Label className="font-medium">Dinheiro</Label>
-                    <p className="text-sm text-gray-500">Pagamento em espécie</p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <Label className="font-medium">Cartão de Crédito</Label>
-                    <p className="text-sm text-gray-500">Visa, Mastercard, etc.</p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <Label className="font-medium">Cartão de Débito</Label>
-                    <p className="text-sm text-gray-500">Débito direto</p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <Label className="font-medium">PIX</Label>
-                    <p className="text-sm text-gray-500">Pagamento instantâneo</p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <Label className="font-medium">Vale Refeição</Label>
-                    <p className="text-sm text-gray-500">Ticket, Sodexo, etc.</p>
-                  </div>
-                  <Switch />
-                </div>
-
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <Label className="font-medium">Vale Alimentação</Label>
-                    <p className="text-sm text-gray-500">Alelo, VR, etc.</p>
-                  </div>
-                  <Switch />
-                </div>
-              </div>
-
-              <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-                <h4 className="font-medium text-blue-900 mb-2">Configurações de Pagamento</h4>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm">Aceitar troco para dinheiro</Label>
-                    <Switch defaultChecked />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm">Valor mínimo para cartão</Label>
-                    <Input type="number" placeholder="10.00" className="w-24 h-8" />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm">Taxa de entrega</Label>
-                    <Input type="number" placeholder="5.00" className="w-24 h-8" />
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <PaymentMethodsScreen user={user} />
         </TabsContent>
 
         <TabsContent value="midia" className="space-y-6">
