@@ -73,7 +73,10 @@ function AppContent() {
   const { user, loading } = useDevUser()
   const [showRegister, setShowRegister] = useState(false)
 
+  console.log("[v0] AppContent: Loading:", loading, "User:", user)
+
   if (loading) {
+    console.log("[v0] AppContent: Mostrando tela de loading")
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
         <div className="text-center">
@@ -84,6 +87,7 @@ function AppContent() {
     )
   }
 
+  console.log("[v0] AppContent: Renderizando MainDashboard")
   return <MainDashboard user={user} />
 
   /* CÓDIGO DE AUTENTICAÇÃO DESABILITADO TEMPORARIAMENTE

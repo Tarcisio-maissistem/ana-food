@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, createContext, useContext } from "react"
+import { useState, createContext, useContext, useEffect } from "react"
 import { Sidebar } from "./sidebar"
 import { Topbar } from "./topbar"
 import { OrdersKanban } from "./orders-kanban"
@@ -38,7 +38,14 @@ export function MainDashboard({ user }: MainDashboardProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
+  useEffect(() => {
+    console.log("[v0] MainDashboard: Componente montado")
+    console.log("[v0] MainDashboard: User:", user)
+    console.log("[v0] MainDashboard: Current screen:", currentScreen)
+  }, [user, currentScreen])
+
   const renderScreen = () => {
+    console.log("[v0] MainDashboard: Renderizando tela:", currentScreen)
     switch (currentScreen) {
       case "pedidos":
         return <OrdersKanban />
@@ -58,6 +65,8 @@ export function MainDashboard({ user }: MainDashboardProps) {
         return <OrdersKanban />
     }
   }
+
+  console.log("[v0] MainDashboard: Renderizando layout principal")
 
   return (
     <UserContext.Provider value={{ user }}>
