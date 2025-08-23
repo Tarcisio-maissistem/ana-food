@@ -19,6 +19,13 @@ export async function GET(request: NextRequest) {
       const { data: allCompanies } = await supabase.from("companies").select("id, name, cnpj, user_id").limit(10)
       console.log("[v0] API Companies: Empresas existentes no banco:", allCompanies)
 
+      const { data: companiesByCnpj } = await supabase
+        .from("companies")
+        .select("id, name, cnpj, user_id")
+        .ilike("cnpj", "%12.345.678/0001-99%")
+        .limit(5)
+      console.log("[v0] API Companies: Empresas com CNPJ 12.345.678/0001-99:", companiesByCnpj)
+
       const { data: company, error } = await supabase.from("companies").select("*").eq("user_id", user.id).maybeSingle()
 
       if (!error && company) {
