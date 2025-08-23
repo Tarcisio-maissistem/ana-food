@@ -35,28 +35,46 @@ export async function getEmpresa(): Promise<EmpresaData | null> {
       }
     }
 
-    // Busca no backend
     console.log("Buscando dados da empresa no servidor...")
-    const res = await fetch("/api/empresa")
+    const res = await fetch("/api/companies", {
+      headers: {
+        "x-user-email": "tarcisiorp16@gmail.com", // Usando email do usuário logado
+      },
+    })
 
     if (!res.ok) {
       console.error(`Erro HTTP ao buscar empresa: ${res.status}`)
       throw new Error(`Erro HTTP: ${res.status}`)
     }
 
-    const empresa: EmpresaData = await res.json()
-    console.log("Dados recebidos da API:", empresa)
+    const companyData = await res.json()
+    console.log("Dados recebidos da API Companies:", companyData)
 
-    // Atualiza cache
-    const dadosComCache = {
-      ...empresa,
+    const empresa: EmpresaData = {
+      id: companyData.id,
+      cnpj: companyData.cnpj || "",
+      nome: companyData.name || "",
+      name: companyData.name || "",
+      telefone: companyData.phone || "",
+      phone: companyData.phone || "",
+      endereco: companyData.address || "",
+      address: companyData.address || "",
+      email: companyData.email || "",
+      working_hours: companyData.working_hours || "",
+      delivery_time: companyData.delivery_time || 0,
+      minimum_order: companyData.minimum_order || 0,
+      location_link: companyData.location_link || "",
+      notes: companyData.notes || "",
+      created_at: companyData.created_at || "",
+      updated_at: companyData.updated_at || "",
       ultima_atualizacao: new Date().toISOString(),
     }
 
-    localStorage.setItem(CACHE_KEY, JSON.stringify(dadosComCache))
+    // Atualiza cache
+    localStorage.setItem(CACHE_KEY, JSON.stringify(empresa))
     console.log("Dados da empresa atualizados no cache")
 
-    return dadosComCache
+    return empresa
   } catch (error) {
     console.error("Erro ao buscar dados da empresa:", error)
     return null
@@ -67,10 +85,11 @@ export async function updateEmpresa(dados: Partial<EmpresaData>): Promise<Empres
   try {
     console.log("Enviando dados para atualização:", dados)
 
-    const res = await fetch("/api/empresa", {
+    const res = await fetch("/api/companies", {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
+        "x-user-email": "tarcisiorp16@gmail.com", // Usando email do usuário logado
       },
       body: JSON.stringify(dados),
     })
@@ -81,19 +100,34 @@ export async function updateEmpresa(dados: Partial<EmpresaData>): Promise<Empres
       throw new Error(`Erro HTTP: ${res.status}`)
     }
 
-    const empresa: EmpresaData = await res.json()
-    console.log("Dados atualizados recebidos:", empresa)
+    const companyData = await res.json()
+    console.log("Dados atualizados recebidos:", companyData)
 
-    // Atualiza cache
-    const dadosComCache = {
-      ...empresa,
+    const empresa: EmpresaData = {
+      id: companyData.id,
+      cnpj: companyData.cnpj || "",
+      nome: companyData.name || "",
+      name: companyData.name || "",
+      telefone: companyData.phone || "",
+      phone: companyData.phone || "",
+      endereco: companyData.address || "",
+      address: companyData.address || "",
+      email: companyData.email || "",
+      working_hours: companyData.working_hours || "",
+      delivery_time: companyData.delivery_time || 0,
+      minimum_order: companyData.minimum_order || 0,
+      location_link: companyData.location_link || "",
+      notes: companyData.notes || "",
+      created_at: companyData.created_at || "",
+      updated_at: companyData.updated_at || "",
       ultima_atualizacao: new Date().toISOString(),
     }
 
-    localStorage.setItem(CACHE_KEY, JSON.stringify(dadosComCache))
+    // Atualiza cache
+    localStorage.setItem(CACHE_KEY, JSON.stringify(empresa))
     console.log("Dados da empresa atualizados no cache")
 
-    return dadosComCache
+    return empresa
   } catch (error) {
     console.error("Erro ao atualizar dados da empresa:", error)
     throw error // Re-throw para que o componente possa tratar o erro
