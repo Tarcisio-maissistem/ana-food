@@ -302,6 +302,10 @@ const SettingsScreen = () => {
   }
 
   const callWhatsAppAPI = async (action: string, data?: any) => {
+    const currentInstanceName = data?.instanceName || instanceName || whatsappSession.instanceName
+
+    console.log("[v0] WhatsApp: Chamando API com ação:", action, "instância:", currentInstanceName)
+
     const response = await fetch("/api/whatsapp/instance", {
       method: "POST",
       headers: {
@@ -309,7 +313,7 @@ const SettingsScreen = () => {
       },
       body: JSON.stringify({
         action,
-        instanceName,
+        instanceName: currentInstanceName,
         ...data,
       }),
     })
@@ -324,7 +328,14 @@ const SettingsScreen = () => {
 
   const connectToExistingInstance = async () => {
     try {
-      const connectResponse = await callWhatsAppAPI("connect")
+      const currentInstanceName = instanceName || whatsappSession.instanceName
+      if (!currentInstanceName) {
+        throw new Error("Nome da instância não definido")
+      }
+
+      console.log("[v0] WhatsApp: Conectando à instância:", currentInstanceName)
+
+      const connectResponse = await callWhatsAppAPI("connect", { instanceName: currentInstanceName })
 
       console.log("Resposta da conexão:", connectResponse)
 
