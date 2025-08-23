@@ -257,6 +257,24 @@ const SettingsScreen = () => {
         try {
           const errorData = JSON.parse(responseText)
           errorMessage = errorData.error || errorMessage
+
+          if (errorData.response && errorData.response.includes("already in use")) {
+            console.log("[v0] WhatsApp: Instância já existe, conectando à instância existente...")
+
+            setWhatsappSession((prev) => ({
+              ...prev,
+              status: "connecting",
+              lastUpdate: new Date(),
+              error: undefined,
+            }))
+
+            // Connect to existing instance instead of creating new one
+            setTimeout(async () => {
+              await connectToExistingInstance()
+            }, 1000)
+
+            return // Exit early, don't throw error
+          }
         } catch {
           errorMessage = responseText || errorMessage
         }
