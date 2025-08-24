@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, Menu, User, Settings, LogOut, Phone } from "lucide-react"
+import { Menu, User, Settings, LogOut, Phone } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,13 +30,25 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
 
   const loadWhatsappAlerts = async () => {
     try {
-      const response = await fetch("/api/whatsapp-alerts")
+      const response = await fetch("/api/whatsapp-alerts", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-email": "tarcisiorp16@gmail.com", // Add user email header expected by API
+        },
+      })
+
       if (response.ok) {
         const alerts = await response.json()
-        setWhatsappAlerts(alerts)
+        console.log("[v0] WhatsApp Alerts: Carregados", alerts?.length || 0, "alertas")
+        setWhatsappAlerts(alerts || [])
+      } else {
+        console.error("[v0] WhatsApp Alerts: Erro na resposta:", response.status, response.statusText)
+        setWhatsappAlerts([])
       }
     } catch (error) {
-      console.error("Erro ao carregar alertas WhatsApp:", error)
+      console.error("[v0] WhatsApp Alerts: Erro ao carregar alertas:", error)
+      setWhatsappAlerts([])
     }
   }
 
@@ -50,10 +61,22 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
 
   const removeAlert = async (alertId: string) => {
     try {
-      await fetch(`/api/whatsapp-alerts/${alertId}`, { method: "DELETE" })
-      setWhatsappAlerts((prev) => prev.filter((alert) => alert.id !== alertId))
+      const response = await fetch(`/api/whatsapp-alerts/${alertId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-email": "tarcisiorp16@gmail.com",
+        },
+      })
+
+      if (response.ok) {
+        setWhatsappAlerts((prev) => prev.filter((alert) => alert.id !== alertId))
+        console.log("[v0] WhatsApp Alerts: Alerta removido:", alertId)
+      } else {
+        console.error("[v0] WhatsApp Alerts: Erro ao remover alerta:", response.status)
+      }
     } catch (error) {
-      console.error("Erro ao remover alerta:", error)
+      console.error("[v0] WhatsApp Alerts: Erro ao remover alerta:", error)
     }
   }
 
@@ -77,10 +100,7 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
             <Menu className="w-4 h-4" />
           </Button>
 
-          <div className="relative">
-            
-            
-          </div>
+          <div className="relative"></div>
         </div>
 
         <div className="flex items-center gap-3">
