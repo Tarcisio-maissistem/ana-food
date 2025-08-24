@@ -100,13 +100,13 @@ export function EstabelecimentoScreen() {
 
     // Funcionamento
     horarios: {
-      segunda: { abertura: "08:00", fechamento: "22:00", fechado: false },
-      terca: { abertura: "08:00", fechamento: "22:00", fechado: false },
-      quarta: { abertura: "08:00", fechamento: "22:00", fechado: false },
-      quinta: { abertura: "08:00", fechamento: "22:00", fechado: false },
-      sexta: { abertura: "08:00", fechamento: "22:00", fechado: false },
-      sabado: { abertura: "08:00", fechamento: "22:00", fechado: true },
-      domingo: { abertura: "08:00", fechamento: "22:00", fechado: true },
+      segunda: { abertura: "10:00", fechamento: "14:00", fechado: false },
+      terca: { abertura: "10:00", fechamento: "14:00", fechado: false },
+      quarta: { abertura: "10:00", fechamento: "14:00", fechado: false },
+      quinta: { abertura: "10:00", fechamento: "14:00", fechado: false },
+      sexta: { abertura: "10:00", fechamento: "14:00", fechado: false },
+      sabado: { abertura: "10:00", fechamento: "14:00", fechado: false },
+      domingo: { abertura: "10:00", fechamento: "14:00", fechado: true },
     },
 
     // Operação
@@ -114,6 +114,7 @@ export function EstabelecimentoScreen() {
     retiradaLocal: true,
     entregaPropria: true,
     entregaMotoboy: false,
+    aceiteAutomatico: false,
 
     // Cardápio digital
     linkCardapio: "",
@@ -195,19 +196,20 @@ export function EstabelecimentoScreen() {
             locationLink: data.location_link || "",
 
             horarios: data.horarios || {
-              segunda: { abertura: "08:00", fechamento: "22:00", fechado: false },
-              terca: { abertura: "08:00", fechamento: "22:00", fechado: false },
-              quarta: { abertura: "08:00", fechamento: "22:00", fechado: false },
-              quinta: { abertura: "08:00", fechamento: "22:00", fechado: false },
-              sexta: { abertura: "08:00", fechamento: "22:00", fechado: false },
-              sabado: { abertura: "08:00", fechamento: "22:00", fechado: true },
-              domingo: { abertura: "08:00", fechamento: "22:00", fechado: true },
+              segunda: { abertura: "10:00", fechamento: "14:00", fechado: false },
+              terca: { abertura: "10:00", fechamento: "14:00", fechado: false },
+              quarta: { abertura: "10:00", fechamento: "14:00", fechado: false },
+              quinta: { abertura: "10:00", fechamento: "14:00", fechado: false },
+              sexta: { abertura: "10:00", fechamento: "14:00", fechado: false },
+              sabado: { abertura: "10:00", fechamento: "14:00", fechado: false },
+              domingo: { abertura: "10:00", fechamento: "14:00", fechado: true },
             },
 
             tempoMedioPreparo: data.tempo_medio_preparo || data.delivery_time?.replace(/\D/g, "") || "30",
             retiradaLocal: data.retirada_local !== false,
             entregaPropria: data.entrega_propria !== false,
             entregaMotoboy: data.entrega_motoboy || false,
+            aceiteAutomatico: data.aceite_automatico || false,
 
             linkCardapio: data.link_cardapio || "",
           })
@@ -390,6 +392,7 @@ export function EstabelecimentoScreen() {
           tempo_medio_preparo: formData.tempoMedioPreparo,
           retirada_local: formData.retiradaLocal,
           entrega_propria: formData.entregaPropria,
+          aceite_automatico: formData.aceiteAutomatico,
           link_cardapio: formData.linkCardapio,
           logo_url: logoUrl,
           photos: photos,
@@ -958,6 +961,20 @@ export function EstabelecimentoScreen() {
                     id="entregaPropria"
                     checked={formData.entregaPropria}
                     onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, entregaPropria: checked }))}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <Label htmlFor="aceiteAutomatico">Aceite Automático</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Aceitar pedidos automaticamente sem confirmação manual
+                    </p>
+                  </div>
+                  <Switch
+                    id="aceiteAutomatico"
+                    checked={formData.aceiteAutomatico}
+                    onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, aceiteAutomatico: checked }))}
                   />
                 </div>
               </CardContent>
