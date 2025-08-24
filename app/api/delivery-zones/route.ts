@@ -17,13 +17,37 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 })
     }
 
-    // Buscar empresa do usuário
-    const { data: company, error: companyError } = await supabase
+    // Primeiro tentar buscar por CNPJ (abordagem que funciona em outras APIs)
+    const { data: companiesByCnpj, error: cnpjError } = await supabase
       .from("companies")
-      .select("id")
-      .eq("user_id", user.id)
-      .single()
-    console.log("[v0] Delivery Zones API: Empresa encontrada:", company?.id, "Erro:", companyError)
+      .select("id, cnpj")
+      .not("cnpj", "is", null)
+      .limit(10)
+
+    console.log(
+      "[v0] Delivery Zones API: Empresas encontradas por CNPJ:",
+      companiesByCnpj?.length || 0,
+      "Erro:",
+      cnpjError,
+    )
+
+    let company = null
+
+    // Se encontrou empresas, usar a primeira (assumindo que há apenas uma empresa ativa)
+    if (companiesByCnpj && companiesByCnpj.length > 0) {
+      company = companiesByCnpj[0]
+      console.log("[v0] Delivery Zones API: Usando empresa encontrada por CNPJ:", company.id)
+    } else {
+      // Fallback: tentar buscar por user_id
+      const { data: companyByUser, error: companyError } = await supabase
+        .from("companies")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle()
+
+      console.log("[v0] Delivery Zones API: Empresa encontrada por user_id:", companyByUser?.id, "Erro:", companyError)
+      company = companyByUser
+    }
 
     if (!company) {
       console.log("[v0] Delivery Zones API: Empresa não encontrada")
@@ -71,8 +95,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 })
     }
 
-    // Buscar empresa do usuário
-    const { data: company } = await supabase.from("companies").select("id").eq("user_id", user.id).single()
+    // Primeiro tentar buscar por CNPJ
+    const { data: companiesByCnpj } = await supabase
+      .from("companies")
+      .select("id, cnpj")
+      .not("cnpj", "is", null)
+      .limit(10)
+
+    let company = null
+
+    if (companiesByCnpj && companiesByCnpj.length > 0) {
+      company = companiesByCnpj[0]
+    } else {
+      // Fallback: tentar buscar por user_id
+      const { data: companyByUser } = await supabase.from("companies").select("id").eq("user_id", user.id).maybeSingle()
+      company = companyByUser
+    }
 
     if (!company) {
       return NextResponse.json({ error: "Empresa não encontrada" }, { status: 404 })
