@@ -54,46 +54,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Empresa não encontrada" }, { status: 404 })
     }
 
-    console.log("[v0] Delivery Zones API: Verificando/criando tabela delivery_zones")
-    try {
-      await supabase.rpc("create_delivery_zones_table_if_not_exists")
-      console.log("[v0] Delivery Zones API: Tabela delivery_zones verificada/criada com sucesso")
-    } catch (tableError) {
-      console.log("[v0] Delivery Zones API: Erro ao verificar/criar tabela, tentando criar via SQL direto")
-      // Try to create the table directly
-      const createTableSQL = `
-        CREATE TABLE IF NOT EXISTS delivery_zones (
-          id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-          company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
-          zone VARCHAR NOT NULL,
-          price NUMERIC NOT NULL,
-          active BOOLEAN DEFAULT true,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        );
-        
-        -- Enable RLS
-        ALTER TABLE delivery_zones ENABLE ROW LEVEL SECURITY;
-        
-        -- Create RLS policy
-        CREATE POLICY IF NOT EXISTS "delivery_zones_policy" ON delivery_zones
-        FOR ALL USING (
-          company_id IN (
-            SELECT id FROM companies 
-            WHERE user_id = auth.uid() 
-            OR cnpj IS NOT NULL
-          )
-        );
-      `
-
-      try {
-        await supabase.rpc("exec_sql", { sql: createTableSQL })
-        console.log("[v0] Delivery Zones API: Tabela criada via SQL direto")
-      } catch (sqlError) {
-        console.log("[v0] Delivery Zones API: Não foi possível criar tabela automaticamente")
-      }
-    }
-
     // Buscar bairros de entrega
     console.log("[v0] Delivery Zones API: Buscando bairros para company_id:", company.id)
     const { data: zones, error } = await supabase
