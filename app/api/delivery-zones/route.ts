@@ -54,17 +54,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Empresa não encontrada" }, { status: 404 })
     }
 
-    // Verificar se a tabela delivery_zones existe
-    const { data: tableCheck, error: tableError } = await supabase.rpc("check_table_exists", {
-      table_name: "delivery_zones",
-    })
-    console.log("[v0] Delivery Zones API: Tabela delivery_zones existe:", tableCheck, "Erro:", tableError)
-
     // Buscar bairros de entrega
     console.log("[v0] Delivery Zones API: Buscando bairros para company_id:", company.id)
     const { data: zones, error } = await supabase
       .from("delivery_zones")
-      .select("*")
+      .select("id, zone, price, active, created_at, updated_at")
       .eq("company_id", company.id)
       .order("zone")
 
@@ -72,6 +66,10 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error("[v0] Delivery Zones API: Erro ao buscar bairros:", error)
+      if (error.message.includes("does not exist")) {
+        console.log("[v0] Delivery Zones API: Tabela não existe ainda, retornando array vazio")
+        return NextResponse.json([])
+      }
       return NextResponse.json({ error: "Erro ao buscar bairros" }, { status: 500 })
     }
 
