@@ -243,17 +243,24 @@ export function EstabelecimentoScreen() {
 
   const loadBairros = async () => {
     try {
+      console.log("[v0] EstabelecimentoScreen: Iniciando carregamento dos bairros...")
       const response = await fetch("/api/delivery-zones", {
         headers: {
           "x-user-email": "tarcisiorp16@gmail.com",
         },
       })
+
+      console.log("[v0] EstabelecimentoScreen: Response status bairros:", response.status)
+
       if (response.ok) {
         const data = await response.json()
+        console.log("[v0] EstabelecimentoScreen: Bairros recebidos:", data.length, "bairros")
         setBairros(data)
+      } else {
+        console.error("[v0] EstabelecimentoScreen: Erro na resposta da API bairros:", response.status)
       }
     } catch (error) {
-      console.error("Erro ao carregar bairros:", error)
+      console.error("[v0] EstabelecimentoScreen: Erro ao carregar bairros:", error)
     }
   }
 
