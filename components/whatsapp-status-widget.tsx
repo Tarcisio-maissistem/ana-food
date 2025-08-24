@@ -31,14 +31,6 @@ export function WhatsAppStatusWidget({ onReconnect, onConnectionError }: WhatsAp
       try {
         setIsChecking(true)
 
-        const apiKey = process.env.NEXT_PUBLIC_EVOLUTION_API_KEY
-        if (!apiKey || !apiKey.trim()) {
-          console.log("API Key não configurada, definindo como desconectado")
-          setStatus("disconnected")
-          setRetryCount(0)
-          return
-        }
-
         const empresaData = localStorage.getItem("empresa-data")
         let instanceName = "ana-food-instance"
 
