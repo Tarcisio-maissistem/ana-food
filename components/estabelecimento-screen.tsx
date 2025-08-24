@@ -254,13 +254,23 @@ export function EstabelecimentoScreen() {
 
       if (response.ok) {
         const data = await response.json()
-        console.log("[v0] EstabelecimentoScreen: Bairros recebidos:", data.length, "bairros")
-        setBairros(data)
+        if (Array.isArray(data)) {
+          console.log("[v0] EstabelecimentoScreen: Bairros recebidos:", data.length, "bairros")
+          setBairros(data)
+        } else if (data && Array.isArray(data.zones)) {
+          console.log("[v0] EstabelecimentoScreen: Bairros recebidos via zones property:", data.zones.length, "bairros")
+          setBairros(data.zones)
+        } else {
+          console.log("[v0] EstabelecimentoScreen: Resposta inválida, usando array vazio")
+          setBairros([])
+        }
       } else {
         console.error("[v0] EstabelecimentoScreen: Erro na resposta da API bairros:", response.status)
+        setBairros([])
       }
     } catch (error) {
       console.error("[v0] EstabelecimentoScreen: Erro ao carregar bairros:", error)
+      setBairros([])
     }
   }
 
