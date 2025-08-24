@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
 import {
   Building2,
   Save,
@@ -74,6 +75,15 @@ export function EstabelecimentoScreen() {
   const user = { email: "tarcisiorp16@gmail.com" }
 
   const BUCKET_NAME = "avatars"
+
+  const [bairros, setBairros] = useState<any[]>([])
+  const [showBairroForm, setShowBairroForm] = useState(false)
+  const [editingBairro, setEditingBairro] = useState<any>(null)
+  const [bairroForm, setBairroForm] = useState({
+    zone: "",
+    price: "",
+    active: true,
+  })
 
   const [formData, setFormData] = useState({
     // Informações básicas
@@ -147,6 +157,7 @@ export function EstabelecimentoScreen() {
   useEffect(() => {
     console.log("[v0] EstabelecimentoScreen: Componente montado, iniciando carregamento")
     loadEmpresaData()
+    loadBairros() // Carregando bairros ao montar componente
   }, [])
 
   useEffect(() => {
@@ -156,12 +167,13 @@ export function EstabelecimentoScreen() {
   }, [formData.cnpj])
 
   const loadEmpresaData = async () => {
-    setLoading(true)
     try {
       console.log("[v0] EstabelecimentoScreen: Iniciando carregamento dos dados da empresa...")
+      setLoading(true)
+
       const response = await fetch("/api/companies", {
         headers: {
-          "X-User-Email": "tarcisiorp16@gmail.com",
+          "x-user-email": "tarcisiorp16@gmail.com",
         },
       })
 
@@ -169,67 +181,151 @@ export function EstabelecimentoScreen() {
 
       if (response.ok) {
         const data = await response.json()
-        console.log("[v0] EstabelecimentoScreen: Dados recebidos da API:", data)
+        console.log(
+          "[v0] EstabelecimentoScreen: Dados recebidos da API:",
+          JSON.stringify(data).substring(0, 500) + "...",
+        )
 
-        if (data && (data.name || data.cnpj)) {
+        if (data && Object.keys(data).length > 0) {
           console.log("[v0] EstabelecimentoScreen: Dados válidos encontrados, atualizando formulário")
-          setEmpresa(data)
+
+          let horariosFormatados = formData.horarios // usar horários padrão como fallback
+
+          if (data.horarios && typeof data.horarios === "object") {
+            // Se horarios existe como objeto JSON, usar diretamente
+            horariosFormatados = data.horarios
+          } else if (data.working_hours && typeof data.working_hours === "string") {
+            // Se working_hours existe como string, tentar parsear ou usar padrão
+            console.log(
+              "[v0] EstabelecimentoScreen: Usando horários padrão pois working_hours é string:",
+              data.working_hours,
+            )
+          }
+
           setFormData({
+            ...formData,
             nomeFantasia: data.name || "",
-            razaoSocial: data.razao_social || data.name || "",
+            razaoSocial: data.legal_name || data.name || "",
             cnpj: data.cnpj || "",
-            cpf: data.cpf || "",
             telefone: data.phone || "",
-            whatsapp: data.whatsapp || data.phone || "",
             email: data.email || "",
-            site: data.site || "",
-            instagram: data.instagram || "",
-            facebook: data.facebook || "",
-
-            rua: data.rua || (data.address ? data.address.split(",")[0] : ""),
-            numero: data.numero || "",
-            complemento: data.complemento || "",
-            bairro: data.bairro || "",
-            cidade: data.cidade || "",
-            uf: data.uf || "",
-            cep: data.cep || "",
+            rua: data.address?.split("\n")[0] || data.address || "",
+            numero: data.number || "",
+            bairro: data.neighborhood || "",
+            cidade: data.city || "",
+            uf: data.state || "",
+            cep: data.zip_code || "",
             locationLink: data.location_link || "",
-
-            horarios: data.horarios || {
-              segunda: { abertura: "10:00", fechamento: "14:00", fechado: false },
-              terca: { abertura: "10:00", fechamento: "14:00", fechado: false },
-              quarta: { abertura: "10:00", fechamento: "14:00", fechado: false },
-              quinta: { abertura: "10:00", fechamento: "14:00", fechado: false },
-              sexta: { abertura: "10:00", fechamento: "14:00", fechado: false },
-              sabado: { abertura: "10:00", fechamento: "14:00", fechado: false },
-              domingo: { abertura: "10:00", fechamento: "14:00", fechado: true },
-            },
-
-            tempoMedioPreparo: data.tempo_medio_preparo || data.delivery_time?.replace(/\D/g, "") || "30",
-            retiradaLocal: data.retirada_local !== false,
-            entregaPropria: data.entrega_propria !== false,
-            entregaMotoboy: data.entrega_motoboy || false,
+            horarios: horariosFormatados, // Usando horários formatados
+            tempoMedioPreparo: data.delivery_time?.replace(" min", "") || "30",
+            retiradaLocal: data.retiradaLocal,
+            entregaPropria: data.entregaPropria,
+            entregaMotoboy: false,
             aceiteAutomatico: data.aceite_automatico || false,
-
-            linkCardapio: data.link_cardapio || "",
+            linkCardapio: data.linkCardapio,
           })
+
           console.log("[v0] EstabelecimentoScreen: FormData atualizado com sucesso")
-        } else {
-          console.log("[v0] EstabelecimentoScreen: Nenhum dado válido encontrado, usando dados padrão")
         }
-      } else {
-        console.log("[v0] EstabelecimentoScreen: Erro na resposta da API:", response.status, response.statusText)
       }
     } catch (error) {
-      console.error("[v0] EstabelecimentoScreen: Erro ao carregar dados da empresa:", error)
+      console.error("[v0] EstabelecimentoScreen: Erro ao carregar dados:", error)
       toast({
-        type: "error",
         title: "Erro",
         description: "Erro ao carregar dados da empresa",
+        variant: "destructive",
       })
     } finally {
       setLoading(false)
       console.log("[v0] EstabelecimentoScreen: Carregamento finalizado")
+    }
+  }
+
+  const loadBairros = async () => {
+    try {
+      const response = await fetch("/api/delivery-zones", {
+        headers: {
+          "x-user-email": "tarcisiorp16@gmail.com",
+        },
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setBairros(data)
+      }
+    } catch (error) {
+      console.error("Erro ao carregar bairros:", error)
+    }
+  }
+
+  const handleSaveBairro = async () => {
+    try {
+      const method = editingBairro ? "PUT" : "POST"
+      const url = editingBairro ? `/api/delivery-zones/${editingBairro.id}` : "/api/delivery-zones"
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-email": "tarcisiorp16@gmail.com",
+        },
+        body: JSON.stringify({
+          zone: bairroForm.zone,
+          price: Number.parseFloat(bairroForm.price),
+          active: bairroForm.active,
+        }),
+      })
+
+      if (response.ok) {
+        toast({
+          title: "Sucesso",
+          description: editingBairro ? "Bairro atualizado com sucesso!" : "Bairro cadastrado com sucesso!",
+        })
+        setShowBairroForm(false)
+        setEditingBairro(null)
+        setBairroForm({ zone: "", price: "", active: true })
+        loadBairros()
+      }
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar bairro",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleEditBairro = (bairro: any) => {
+    setEditingBairro(bairro)
+    setBairroForm({
+      zone: bairro.zone,
+      price: bairro.price.toString(),
+      active: bairro.active,
+    })
+    setShowBairroForm(true)
+  }
+
+  const handleDeleteBairro = async (id: string) => {
+    try {
+      const response = await fetch(`/api/delivery-zones/${id}`, {
+        method: "DELETE",
+        headers: {
+          "x-user-email": "tarcisiorp16@gmail.com",
+        },
+      })
+
+      if (response.ok) {
+        toast({
+          title: "Sucesso",
+          description: "Bairro excluído com sucesso!",
+        })
+        loadBairros()
+      }
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir bairro",
+        variant: "destructive",
+      })
     }
   }
 
@@ -500,10 +596,11 @@ export function EstabelecimentoScreen() {
       </div>
 
       <Tabs defaultValue="basico" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="basico">Básico</TabsTrigger>
           <TabsTrigger value="funcionamento">Funcionamento</TabsTrigger>
           <TabsTrigger value="delivery">Delivery</TabsTrigger>
+          <TabsTrigger value="bairros">Bairros de Entrega</TabsTrigger>
         </TabsList>
 
         <TabsContent value="basico" className="space-y-6">
@@ -1063,6 +1160,100 @@ export function EstabelecimentoScreen() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="bairros" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <MapPin className="h-5 w-5" />
+                Bairros de Entrega
+              </CardTitle>
+              <CardDescription>Gerencie os bairros atendidos e valores de entrega</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <Button onClick={() => setShowBairroForm(true)} className="mb-4">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adicionar Bairro
+                </Button>
+
+                {showBairroForm && (
+                  <Card className="p-4">
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="zone">Nome do Bairro</Label>
+                        <Input
+                          id="zone"
+                          value={bairroForm.zone}
+                          onChange={(e) => setBairroForm({ ...bairroForm, zone: e.target.value })}
+                          placeholder="Digite o nome do bairro"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="price">Valor da Entrega (R$)</Label>
+                        <Input
+                          id="price"
+                          type="number"
+                          step="0.01"
+                          value={bairroForm.price}
+                          onChange={(e) => setBairroForm({ ...bairroForm, price: e.target.value })}
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="active"
+                          checked={bairroForm.active}
+                          onCheckedChange={(checked) => setBairroForm({ ...bairroForm, active: checked })}
+                        />
+                        <Label htmlFor="active">Ativo</Label>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button onClick={handleSaveBairro}>{editingBairro ? "Atualizar" : "Salvar"}</Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setShowBairroForm(false)
+                            setEditingBairro(null)
+                            setBairroForm({ zone: "", price: "", active: true })
+                          }}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                )}
+
+                <div className="space-y-2">
+                  {bairros.map((bairro) => (
+                    <div key={bairro.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div>
+                          <p className="font-medium">{bairro.zone}</p>
+                          <p className="text-sm text-muted-foreground">
+                            R$ {Number.parseFloat(bairro.price).toFixed(2)}
+                          </p>
+                        </div>
+                        <Badge variant={bairro.active ? "default" : "secondary"}>
+                          {bairro.active ? "Ativo" : "Inativo"}
+                        </Badge>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => handleEditBairro(bairro)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleDeleteBairro(bairro.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 
