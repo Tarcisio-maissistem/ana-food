@@ -18,6 +18,8 @@ import {
   RefreshCw,
   Upload,
   ImageIcon,
+  X,
+  Lock,
   Clock,
   Truck,
   MapPin,
@@ -25,11 +27,9 @@ import {
   Plus,
   Edit,
   Trash2,
-  Building,
 } from "lucide-react"
-import type { EmpresaData } from "@/utils/cache-empresa"
+import { formatCNPJ, formatTelefone, type EmpresaData } from "@/utils/cache-empresa"
 import { toast } from "@/components/ui/use-toast"
-import { Textarea } from "@/components/ui/textarea"
 
 const formatCPF = (cpf: string) => {
   if (!cpf) return ""
@@ -128,13 +128,6 @@ export function EstabelecimentoScreen() {
 
     // Cardápio digital
     linkCardapio: "",
-
-    name: "",
-    phone: "",
-    address: "",
-    location_link: "",
-    notes: "",
-    on_off: true,
   })
 
   const [paymentMethods, setPaymentMethods] = useState([
@@ -162,9 +155,9 @@ export function EstabelecimentoScreen() {
   }
 
   useEffect(() => {
+    console.log("[v0] EstabelecimentoScreen: Componente montado, iniciando carregamento")
     loadEmpresaData()
-    loadPaymentMethods()
-    loadBairros()
+    loadBairros() // Carregando bairros ao montar componente
   }, [])
 
   useEffect(() => {
@@ -230,12 +223,6 @@ export function EstabelecimentoScreen() {
             entregaMotoboy: false,
             aceiteAutomatico: data.aceite_automatico || false,
             linkCardapio: data.linkCardapio,
-            name: data.name || "",
-            phone: data.phone || "",
-            address: data.address || "",
-            location_link: data.location_link || "",
-            notes: data.notes || "",
-            on_off: data.on_off || true,
           })
 
           console.log("[v0] EstabelecimentoScreen: FormData atualizado com sucesso")
@@ -268,27 +255,6 @@ export function EstabelecimentoScreen() {
     } catch (error) {
       console.error("Erro ao carregar bairros:", error)
     }
-  }
-
-  const loadPaymentMethods = async () => {
-    try {
-      const response = await fetch("/api/payment-methods", {
-        headers: {
-          "x-user-email": "tarcisiorp16@gmail.com",
-        },
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setPaymentMethods(data)
-      }
-    } catch (error) {
-      console.error("Erro ao carregar formas de pagamento:", error)
-    }
-  }
-
-  const handleCnpjChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, "")
-    setFormData((prev) => ({ ...prev, cnpj: value }))
   }
 
   const handleSaveBairro = async () => {
@@ -630,232 +596,416 @@ export function EstabelecimentoScreen() {
       </div>
 
       <Tabs defaultValue="basico" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="basico">Básico</TabsTrigger>
+          <TabsTrigger value="funcionamento">Funcionamento</TabsTrigger>
           <TabsTrigger value="delivery">Delivery</TabsTrigger>
           <TabsTrigger value="bairros">Bairros de Entrega</TabsTrigger>
         </TabsList>
 
         <TabsContent value="basico" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Logo Section - Primeira coluna */}
-            <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Logo Section */}
+            <div className="lg:col-span-1">
               <Card className="h-fit">
                 <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Building className="h-5 w-5" />
-                    Logo do Estabelecimento
-                  </CardTitle>
-                  <CardDescription>Faça upload da logo da sua empresa</CardDescription>
+                  <CardTitle className="text-lg">Logotipo</CardTitle>
+                  <CardDescription>Logo da empresa (máx. 5MB)</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex flex-col items-center space-y-4">
-                    <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50">
-                      <ImageIcon className="h-12 w-12 text-gray-400" />
+                <CardContent className="space-y-4">
+                  {logoUrl ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-center w-full h-40 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+                        <img
+                          src={logoUrl || "/placeholder.svg"}
+                          alt="Logo da empresa"
+                          className="max-h-36 max-w-full object-contain"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={uploadingLogo || !formData.cnpj || formData.cnpj.length < 14}
+                          className="w-full"
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Alterar Logo
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={handleRemoveLogo}
+                          className="w-full text-red-600 hover:text-red-700 hover:bg-red-50 bg-transparent"
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          Remover Logo
+                        </Button>
+                      </div>
                     </div>
-                    <Button variant="outline" size="sm">
-                      <Upload className="h-4 w-4 mr-2" />
-                      Fazer Upload
-                    </Button>
+                  ) : (
+                    <div className="space-y-4">
+                      <div
+                        className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <ImageIcon className="h-10 w-10 text-gray-400 mb-2" />
+                        <p className="text-sm text-gray-500 text-center">
+                          Clique para adicionar
+                          <br />o logo da empresa
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploadingLogo || !formData.cnpj || formData.cnpj.length < 14}
+                        className="w-full"
+                      >
+                        {uploadingLogo ? (
+                          <>
+                            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                            Enviando...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-4 w-4 mr-2" />
+                            Adicionar Logo
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                  />
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Basic Information */}
+            <div className="lg:col-span-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Informações Básicas com Endereço e Localização</CardTitle>
+                  <CardDescription>Dados principais da empresa e localização</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Basic Info Section */}
+                  <div>
+                    <h3 className="font-medium text-gray-900 mb-3">Dados da Empresa</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="md:col-span-2 space-y-2">
+                        <Label htmlFor="nomeFantasia">Nome Fantasia *</Label>
+                        <Input
+                          id="nomeFantasia"
+                          value={formData.nomeFantasia}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, nomeFantasia: e.target.value }))}
+                          placeholder="Nome do restaurante"
+                        />
+                      </div>
+
+                      <div className="md:col-span-2 space-y-2">
+                        <Label htmlFor="razaoSocial">Razão Social</Label>
+                        <Input
+                          id="razaoSocial"
+                          value={formData.razaoSocial}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, razaoSocial: e.target.value }))}
+                          placeholder="Razão social da empresa"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="cnpj" className="flex items-center gap-2">
+                          CNPJ <Lock className="h-3 w-3 text-gray-400" />
+                        </Label>
+                        <Input
+                          id="cnpj"
+                          value={formatCNPJ(formData.cnpj)}
+                          onChange={(e) =>
+                            setFormData((prev) => ({ ...prev, cnpj: e.target.value.replace(/\D/g, "") }))
+                          }
+                          placeholder="00.000.000/0000-00"
+                          maxLength={18}
+                          readOnly
+                          className="bg-gray-50 text-gray-600 cursor-not-allowed"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="cpf">CPF (se pessoa física)</Label>
+                        <Input
+                          id="cpf"
+                          value={formatCPF(formData.cpf)}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, cpf: e.target.value.replace(/\D/g, "") }))}
+                          placeholder="000.000.000-00"
+                          maxLength={14}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="telefone">Telefone *</Label>
+                        <Input
+                          id="telefone"
+                          value={formatTelefone(formData.telefone)}
+                          onChange={(e) =>
+                            setFormData((prev) => ({ ...prev, telefone: e.target.value.replace(/\D/g, "") }))
+                          }
+                          placeholder="(00) 00000-0000"
+                          maxLength={15}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="whatsapp">WhatsApp Oficial</Label>
+                        <Input
+                          id="whatsapp"
+                          value={formatTelefone(formData.whatsapp)}
+                          onChange={(e) =>
+                            setFormData((prev) => ({ ...prev, whatsapp: e.target.value.replace(/\D/g, "") }))
+                          }
+                          placeholder="(00) 00000-0000"
+                          maxLength={15}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="email">E-mail *</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={formData.email}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
+                          placeholder="contato@restaurante.com"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="site">Site/URL</Label>
+                        <Input
+                          id="site"
+                          value={formData.site}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, site: e.target.value }))}
+                          placeholder="https://www.restaurante.com"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="instagram">Instagram</Label>
+                        <Input
+                          id="instagram"
+                          value={formData.instagram}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, instagram: e.target.value }))}
+                          placeholder="@restaurante"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="facebook">Facebook</Label>
+                        <Input
+                          id="facebook"
+                          value={formData.facebook}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, facebook: e.target.value }))}
+                          placeholder="facebook.com/restaurante"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Address Section */}
+                  <div>
+                    <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      Endereço e Localização
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="md:col-span-2 space-y-2">
+                        <Label htmlFor="rua">Rua/Avenida *</Label>
+                        <Input
+                          id="rua"
+                          value={formData.rua}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, rua: e.target.value }))}
+                          placeholder="Nome da rua ou avenida"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="numero">Número *</Label>
+                        <Input
+                          id="numero"
+                          value={formData.numero}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, numero: e.target.value }))}
+                          placeholder="123"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="complemento">Complemento</Label>
+                        <Input
+                          id="complemento"
+                          value={formData.complemento}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, complemento: e.target.value }))}
+                          placeholder="Apto, sala, loja..."
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="bairro">Bairro *</Label>
+                        <Input
+                          id="bairro"
+                          value={formData.bairro}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, bairro: e.target.value }))}
+                          placeholder="Nome do bairro"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="cidade">Cidade *</Label>
+                        <Input
+                          id="cidade"
+                          value={formData.cidade}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, cidade: e.target.value }))}
+                          placeholder="Nome da cidade"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="uf">UF *</Label>
+                        <Input
+                          id="uf"
+                          value={formData.uf}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, uf: e.target.value.toUpperCase() }))}
+                          placeholder="SP"
+                          maxLength={2}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="cep">CEP *</Label>
+                        <Input
+                          id="cep"
+                          value={formData.cep}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, cep: e.target.value.replace(/\D/g, "") }))}
+                          placeholder="00000-000"
+                          maxLength={9}
+                        />
+                      </div>
+
+                      <div className="md:col-span-3 space-y-2">
+                        <Label htmlFor="locationLink" className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4" />
+                          Link de Localização (Google Maps)
+                        </Label>
+                        <Input
+                          id="locationLink"
+                          value={formData.locationLink}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, locationLink: e.target.value }))}
+                          placeholder="https://maps.google.com/..."
+                        />
+                        <p className="text-xs text-gray-500">
+                          Cole o link do Google Maps para cálculo automático de taxa de entrega por distância
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
+            </div>
+          </div>
+        </TabsContent>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Clock className="h-5 w-5" />
-                    Horários de Funcionamento
-                  </CardTitle>
-                  <CardDescription>Configure os horários de abertura e fechamento</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {diasSemana.map((dia) => {
-                      const horarioDia = formData.horarios[dia.key as keyof typeof formData.horarios]
-                      if (!horarioDia) return null
+        <TabsContent value="funcionamento" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Horários de Funcionamento
+              </CardTitle>
+              <CardDescription>Configure os horários de abertura e fechamento</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {diasSemana.map((dia) => {
+                  const horarioDia = formData.horarios[dia.key as keyof typeof formData.horarios]
+                  if (!horarioDia) return null
 
-                      return (
-                        <div key={dia.key} className="flex flex-col gap-2 p-3 border rounded-lg">
-                          <Label className="font-medium">{dia.label}</Label>
+                  return (
+                    <div key={dia.key} className="flex flex-col gap-2 p-3 border rounded-lg">
+                      <Label className="font-medium">{dia.label}</Label>
 
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={!horarioDia.fechado}
+                          onCheckedChange={(checked) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              horarios: {
+                                ...prev.horarios,
+                                [dia.key]: {
+                                  ...prev.horarios[dia.key as keyof typeof prev.horarios],
+                                  fechado: !checked,
+                                },
+                              },
+                            }))
+                          }
+                        />
+                        <Label className="text-sm">Aberto</Label>
+                      </div>
+
+                      {!horarioDia.fechado && (
+                        <>
                           <div className="flex items-center gap-2">
-                            <Switch
-                              checked={!horarioDia.fechado}
-                              onCheckedChange={(checked) =>
+                            <Label className="text-sm">Abertura:</Label>
+                            <Input
+                              type="time"
+                              value={horarioDia.abertura}
+                              onChange={(e) =>
                                 setFormData((prev) => ({
                                   ...prev,
                                   horarios: {
                                     ...prev.horarios,
                                     [dia.key]: {
                                       ...prev.horarios[dia.key as keyof typeof prev.horarios],
-                                      fechado: !checked,
+                                      abertura: e.target.value,
                                     },
                                   },
                                 }))
                               }
+                              className="w-32"
                             />
-                            <Label className="text-sm">Aberto</Label>
                           </div>
 
-                          {!horarioDia.fechado && (
-                            <>
-                              <div className="flex items-center gap-2">
-                                <Label className="text-sm">Abertura:</Label>
-                                <Input
-                                  type="time"
-                                  value={horarioDia.abertura}
-                                  onChange={(e) =>
-                                    setFormData((prev) => ({
-                                      ...prev,
-                                      horarios: {
-                                        ...prev.horarios,
-                                        [dia.key]: {
-                                          ...prev.horarios[dia.key as keyof typeof prev.horarios],
-                                          abertura: e.target.value,
-                                        },
-                                      },
-                                    }))
-                                  }
-                                  className="w-32"
-                                />
-                              </div>
-
-                              <div className="flex items-center gap-2">
-                                <Label className="text-sm">Fechamento:</Label>
-                                <Input
-                                  type="time"
-                                  value={horarioDia.fechamento}
-                                  onChange={(e) =>
-                                    setFormData((prev) => ({
-                                      ...prev,
-                                      horarios: {
-                                        ...prev.horarios,
-                                        [dia.key]: {
-                                          ...prev.horarios[dia.key as keyof typeof prev.horarios],
-                                          fechamento: e.target.value,
-                                        },
-                                      },
-                                    }))
-                                  }
-                                  className="w-32"
-                                />
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Informações Básicas - Segunda coluna */}
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Building className="h-5 w-5" />
-                    Informações Básicas
-                  </CardTitle>
-                  <CardDescription>Dados principais do estabelecimento</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Nome do Estabelecimento</Label>
-                      <Input
-                        id="name"
-                        value={formData.name}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-                        placeholder="Nome da empresa"
-                      />
+                          <div className="flex items-center gap-2">
+                            <Label className="text-sm">Fechamento:</Label>
+                            <Input
+                              type="time"
+                              value={horarioDia.fechamento}
+                              onChange={(e) =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  horarios: {
+                                    ...prev.horarios,
+                                    [dia.key]: {
+                                      ...prev.horarios[dia.key as keyof typeof prev.horarios],
+                                      fechamento: e.target.value,
+                                    },
+                                  },
+                                }))
+                              }
+                              className="w-32"
+                            />
+                          </div>
+                        </>
+                      )}
                     </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="cnpj">CNPJ</Label>
-                      <Input
-                        id="cnpj"
-                        value={formData.cnpj}
-                        onChange={handleCnpjChange}
-                        placeholder="00.000.000/0000-00"
-                        maxLength={18}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">Telefone</Label>
-                      <Input
-                        id="phone"
-                        value={formData.phone}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, phone: e.target.value }))}
-                        placeholder="(00) 00000-0000"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="email">E-mail</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
-                        placeholder="contato@empresa.com"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="address">Endereço Completo</Label>
-                      <Textarea
-                        id="address"
-                        value={formData.address}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, address: e.target.value }))}
-                        placeholder="Rua, número, bairro, cidade - UF"
-                        rows={3}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="location_link">Link de Localização</Label>
-                      <Input
-                        id="location_link"
-                        value={formData.location_link}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, location_link: e.target.value }))}
-                        placeholder="Link do Google Maps"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="notes">Observações</Label>
-                      <Textarea
-                        id="notes"
-                        value={formData.notes}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
-                        placeholder="Informações adicionais"
-                        rows={3}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="on_off">Estabelecimento Ativo</Label>
-                      <Switch
-                        id="on_off"
-                        checked={formData.on_off}
-                        onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, on_off: checked }))}
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-
-          <div className="flex justify-end">
-            <Button onClick={handleSave} disabled={loading}>
-              {loading ? "Salvando..." : "Salvar Alterações"}
-            </Button>
-          </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="delivery" className="space-y-6">
