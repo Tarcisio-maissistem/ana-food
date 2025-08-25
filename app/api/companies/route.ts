@@ -114,6 +114,19 @@ export async function PUT(request: NextRequest) {
       console.log("[v0] API Companies: Colunas disponíveis:", availableColumns)
     }
 
+    const addressComponents = [
+      body.rua || "",
+      body.numero || "",
+      body.complemento || "",
+      body.bairro || "",
+      body.cidade || "",
+      body.uf || "",
+      body.cep || "",
+    ].filter((component) => component.trim() !== "")
+
+    const fullAddress = addressComponents.length > 0 ? addressComponents.join(", ") : "Endereço não informado"
+    console.log("[v0] API Companies: Endereço criado:", fullAddress)
+
     const allFields = {
       name: body.name || "",
       razao_social: body.razao_social || "",
@@ -132,6 +145,7 @@ export async function PUT(request: NextRequest) {
       cidade: body.cidade || "",
       uf: body.uf || "",
       cep: body.cep || "",
+      address: fullAddress,
       horarios: body.horarios || {},
       tempo_medio_preparo: body.tempo_medio_preparo || "30",
       retirada_local: body.retirada_local !== false,
