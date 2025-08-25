@@ -27,6 +27,8 @@ import {
   Plus,
   Edit,
   Trash2,
+  Search,
+  Loader2,
 } from "lucide-react"
 import { formatCNPJ, formatTelefone, type EmpresaData } from "@/utils/cache-empresa"
 import { toast } from "@/components/ui/use-toast"
@@ -471,7 +473,92 @@ export function EstabelecimentoScreen() {
     setPhotos((prev) => prev.filter((_, i) => i !== index))
   }
 
+  const [isLoadingCep, setIsLoadingCep] = useState(false)
+
+  const consultarCEP = async (cep: string) => {
+    if (!cep || cep.length < 8) return
+
+    try {
+      setIsLoadingCep(true)
+      const cepLimpo = cep.replace(/\D/g, "")
+
+      if (cepLimpo.length !== 8) {
+        toast({
+          title: "CEP inválido",
+          description: "O CEP deve conter 8 dígitos",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`)
+      const data = await response.json()
+
+      if (data.erro) {
+        toast({
+          title: "CEP não encontrado",
+          description: "Verifique o CEP informado",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Preencher campos automaticamente
+      setFormData((prev) => ({
+        ...prev,
+        rua: data.logradouro || prev.rua,
+        bairro: data.bairro || prev.bairro,
+        cidade: data.localidade || prev.cidade,
+        uf: data.uf || prev.uf,
+      }))
+
+      toast({
+        title: "CEP consultado com sucesso",
+        description: "Endereço preenchido automaticamente",
+      })
+    } catch (error) {
+      console.error("[v0] EstabelecimentoScreen: Erro ao consultar CEP:", error)
+      toast({
+        title: "Erro ao consultar CEP",
+        description: "Tente novamente mais tarde",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoadingCep(false)
+    }
+  }
+
+  const validateBasicForm = () => {
+    const errors: string[] = []
+
+    if (!formData.nomeFantasia?.trim()) errors.push("Nome da empresa é obrigatório")
+    if (!formData.cnpj?.trim()) errors.push("CNPJ é obrigatório")
+    if (!formData.telefone?.trim()) errors.push("Telefone é obrigatório")
+    if (!formData.email?.trim()) errors.push("E-mail é obrigatório")
+    if (!formData.rua?.trim()) errors.push("Rua é obrigatória")
+    if (!formData.numero?.trim()) errors.push("Número é obrigatório")
+    if (!formData.bairro?.trim()) errors.push("Bairro é obrigatório")
+    if (!formData.cidade?.trim()) errors.push("Cidade é obrigatória")
+    if (!formData.uf?.trim()) errors.push("UF é obrigatório")
+    if (!formData.cep?.trim()) errors.push("CEP é obrigatório")
+
+    if (errors.length > 0) {
+      toast({
+        title: "Campos obrigatórios não preenchidos",
+        description: errors.join(", "),
+        variant: "destructive",
+      })
+      return false
+    }
+
+    return true
+  }
+
   const handleSave = async () => {
+    if (!validateBasicForm()) {
+      return
+    }
+
     setSaving(true)
     try {
       const response = await fetch("/api/companies", {
@@ -839,13 +926,44 @@ export function EstabelecimentoScreen() {
                       Endereço e Localização
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      <div className="md:col-span-2 space-y-2">
-                        <Label htmlFor="rua">Rua/Avenida *</Label>
+                      <div className="md:col-span-2 space-y-4">
+                        <Label htmlFor="cep">CEP *</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="cep"
+                            value={formData.cep}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/\D/g, "").replace(/(\d{5})(\d{3})/, "$1-$2")
+                              setFormData({ ...formData, cep: value })
+                            }}
+                            placeholder="00000-000"
+                            maxLength={9}
+                            className="flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => consultarCEP(formData.cep)}
+                            disabled={isLoadingCep || !formData.cep}
+                            className="px-3"
+                          >
+                            {isLoadingCep ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Search className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="rua">Rua *</Label>
                         <Input
                           id="rua"
                           value={formData.rua}
-                          onChange={(e) => setFormData((prev) => ({ ...prev, rua: e.target.value }))}
-                          placeholder="Nome da rua ou avenida"
+                          onChange={(e) => setFormData({ ...formData, rua: e.target.value })}
+                          placeholder="Nome da rua"
+                          required
                         />
                       </div>
 
@@ -897,17 +1015,6 @@ export function EstabelecimentoScreen() {
                           onChange={(e) => setFormData((prev) => ({ ...prev, uf: e.target.value.toUpperCase() }))}
                           placeholder="SP"
                           maxLength={2}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="cep">CEP *</Label>
-                        <Input
-                          id="cep"
-                          value={formData.cep}
-                          onChange={(e) => setFormData((prev) => ({ ...prev, cep: e.target.value.replace(/\D/g, "") }))}
-                          placeholder="00000-000"
-                          maxLength={9}
                         />
                       </div>
 
