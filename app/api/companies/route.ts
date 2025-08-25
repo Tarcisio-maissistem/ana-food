@@ -127,6 +127,27 @@ export async function PUT(request: NextRequest) {
     const fullAddress = addressComponents.length > 0 ? addressComponents.join(", ") : "Endereço não informado"
     console.log("[v0] API Companies: Endereço criado:", fullAddress)
 
+    let workingHours = "08:00 - 18:00" // Default fallback
+
+    if (body.horarios && typeof body.horarios === "object") {
+      // Find the first open day to use as general working hours
+      const days = ["segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo"]
+      const openDay = days.find(
+        (day) =>
+          body.horarios[day] &&
+          !body.horarios[day].fechado &&
+          body.horarios[day].abertura &&
+          body.horarios[day].fechamento,
+      )
+
+      if (openDay) {
+        const daySchedule = body.horarios[openDay]
+        workingHours = `${daySchedule.abertura} - ${daySchedule.fechamento}`
+      }
+    }
+
+    console.log("[v0] API Companies: Working hours criado:", workingHours)
+
     const allFields = {
       name: body.name || "",
       razao_social: body.razao_social || "",
@@ -146,6 +167,7 @@ export async function PUT(request: NextRequest) {
       uf: body.uf || "",
       cep: body.cep || "",
       address: fullAddress,
+      working_hours: workingHours, // Add working_hours field
       horarios: body.horarios || {},
       tempo_medio_preparo: body.tempo_medio_preparo || "30",
       retirada_local: body.retirada_local !== false,
