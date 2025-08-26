@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
 CREATE TABLE IF NOT EXISTS delivery_zones (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE, // Adding user_id field
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE, -- Adding user_id reference
   zone VARCHAR NOT NULL,
   price NUMERIC NOT NULL,
   active BOOLEAN DEFAULT true,
@@ -124,18 +124,12 @@ export async function POST(request: NextRequest) {
     const userEmail = request.headers.get("x-user-email") || "tarcisiorp16@gmail.com"
     const body = await request.json()
 
-    console.log("[v0] Delivery Zones API: Criando bairro para usuário:", userEmail)
-    console.log("[v0] Delivery Zones API: Dados recebidos:", body)
-
     // Buscar usuário
     const { data: user } = await supabase.from("users").select("id").eq("email", userEmail).single()
 
     if (!user) {
-      console.log("[v0] Delivery Zones API: Usuário não encontrado")
       return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 })
     }
-
-    console.log("[v0] Delivery Zones API: Usuário encontrado:", user.id)
 
     // Primeiro tentar buscar por CNPJ
     const { data: companiesByCnpj } = await supabase
@@ -148,38 +142,33 @@ export async function POST(request: NextRequest) {
 
     if (companiesByCnpj && companiesByCnpj.length > 0) {
       company = companiesByCnpj[0]
-      console.log("[v0] Delivery Zones API: Empresa encontrada por CNPJ:", company.id)
     } else {
       // Fallback: tentar buscar por user_id
       const { data: companyByUser } = await supabase.from("companies").select("id").eq("user_id", user.id).maybeSingle()
       company = companyByUser
-      console.log("[v0] Delivery Zones API: Empresa encontrada por user_id:", company?.id)
     }
 
     if (!company) {
-      console.log("[v0] Delivery Zones API: Empresa não encontrada")
       return NextResponse.json({ error: "Empresa não encontrada" }, { status: 404 })
     }
 
-    const insertData = {
-      company_id: company.id,
-      user_id: user.id, // Adding user_id field
-      zone: body.zone,
-      price: Number.parseFloat(body.price) || 0,
-      active: body.active !== false, // Default to true if not specified
-    }
-
-    console.log("[v0] Delivery Zones API: Inserindo dados:", insertData)
-
-    // Criar bairro de entrega
-    const { data: zone, error } = await supabase.from("delivery_zones").insert(insertData).select().single()
+    const { data: zone, error } = await supabase
+      .from("delivery_zones")
+      .insert({
+        company_id: company.id,
+        user_id: user.id, // Adding user_id to satisfy constraint
+        zone: body.zone,
+        price: body.price,
+        active: body.active,
+      })
+      .select()
+      .single()
 
     if (error) {
       console.error("[v0] Delivery Zones API: Erro ao criar bairro:", error)
-      return NextResponse.json({ error: "Erro ao criar bairro: " + error.message }, { status: 500 })
+      return NextResponse.json({ error: "Erro ao criar bairro" }, { status: 500 })
     }
 
-    console.log("[v0] Delivery Zones API: Bairro criado com sucesso:", zone.id)
     return NextResponse.json(zone)
   } catch (error) {
     console.error("[v0] Delivery Zones API: Erro na API delivery-zones POST:", error)

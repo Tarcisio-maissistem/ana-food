@@ -28,7 +28,6 @@ import {
   Edit,
   Trash2,
   Search,
-  Loader2,
 } from "lucide-react"
 import { formatCNPJ, formatTelefone, type EmpresaData } from "@/utils/cache-empresa"
 import { toast } from "@/components/ui/use-toast"
@@ -43,25 +42,14 @@ const formatCPF = (cpf: string) => {
   return cleaned
 }
 
-const validateMenuUrl = async (url: string): Promise<{ isValid: boolean; suggestion?: string }> => {
-  if (!url.trim()) return { isValid: true }
-
-  try {
-    const response = await fetch("/api/validate-menu-url", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-user-email": "tarcisiorp16@gmail.com" || "",
-      },
-      body: JSON.stringify({ url: url.trim() }),
-    })
-
-    const result = await response.json()
-    return result
-  } catch (error) {
-    console.error("[v0] EstabelecimentoScreen: Erro ao validar URL:", error)
-    return { isValid: true }
+const formatCEP = (cep: string) => {
+  if (!cep) return ""
+  const cleaned = cep.replace(/\D/g, "")
+  const match = cleaned.match(/^(\d{5})(\d{3})$/)
+  if (match) {
+    return `${match[1]}-${match[2]}`
   }
+  return cleaned
 }
 
 export function EstabelecimentoScreen() {
@@ -168,6 +156,80 @@ export function EstabelecimentoScreen() {
     }
   }, [formData.cnpj])
 
+  const consultarCEP = async (cep: string) => {
+    try {
+      const cleanCEP = cep.replace(/\D/g, "")
+      if (cleanCEP.length !== 8) return
+
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCEP}/json/`)
+      const data = await response.json()
+
+      if (!data.erro) {
+        setFormData((prev) => ({
+          ...prev,
+          rua: data.logradouro || prev.rua,
+          bairro: data.bairro || prev.bairro,
+          cidade: data.localidade || prev.cidade,
+          uf: data.uf || prev.uf,
+        }))
+      }
+    } catch (error) {
+      console.error("[v0] Erro ao consultar CEP:", error)
+    }
+  }
+
+  const validateRequiredFields = () => {
+    const requiredFields = {
+      nomeFantasia: "Nome Fantasia",
+      telefone: "Telefone",
+      email: "Email",
+      rua: "Rua/Avenida",
+      numero: "Número",
+      bairro: "Bairro",
+      cidade: "Cidade",
+      uf: "UF",
+      cep: "CEP",
+    }
+
+    const missingFields = []
+    for (const [field, label] of Object.entries(requiredFields)) {
+      if (!formData[field as keyof typeof formData]) {
+        missingFields.push(label)
+      }
+    }
+
+    if (missingFields.length > 0) {
+      toast({
+        title: "Campos obrigatórios não preenchidos",
+        description: `Por favor, preencha: ${missingFields.join(", ")}`,
+        variant: "destructive",
+      })
+      return false
+    }
+    return true
+  }
+
+  const validateMenuUrl = async (url: string): Promise<{ isValid: boolean; suggestion?: string }> => {
+    if (!url.trim()) return { isValid: true }
+
+    try {
+      const response = await fetch("/api/validate-menu-url", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-email": "tarcisiorp16@gmail.com" || "",
+        },
+        body: JSON.stringify({ url: url.trim() }),
+      })
+
+      const result = await response.json()
+      return result
+    } catch (error) {
+      console.error("[v0] EstabelecimentoScreen: Erro ao validar URL:", error)
+      return { isValid: true }
+    }
+  }
+
   const loadEmpresaData = async () => {
     try {
       console.log("[v0] EstabelecimentoScreen: Iniciando carregamento dos dados da empresa...")
@@ -191,6 +253,37 @@ export function EstabelecimentoScreen() {
         if (data && Object.keys(data).length > 0) {
           console.log("[v0] EstabelecimentoScreen: Dados válidos encontrados, atualizando formulário")
 
+          const addressParts = {
+            rua: "",
+            numero: "",
+            complemento: "",
+            bairro: "",
+            cidade: "",
+            uf: "",
+            cep: "",
+          }
+
+          if (data.address) {
+            // Try to parse the address string into components
+            const addressLines = data.address.split("\n")
+            if (addressLines.length > 0) {
+              // First line usually contains street and number
+              const firstLine = addressLines[0]
+              const streetMatch = firstLine.match(/^(.+?)\s+(\d+.*)$/)
+              if (streetMatch) {
+                addressParts.rua = streetMatch[1]
+                addressParts.numero = streetMatch[2]
+              } else {
+                addressParts.rua = firstLine
+              }
+
+              // Second line might contain neighborhood/complement
+              if (addressLines.length > 1) {
+                addressParts.bairro = addressLines[1]
+              }
+            }
+          }
+
           let horariosFormatados = formData.horarios // usar horários padrão como fallback
 
           if (data.horarios && typeof data.horarios === "object") {
@@ -211,12 +304,15 @@ export function EstabelecimentoScreen() {
             cnpj: data.cnpj || "",
             telefone: data.phone || "",
             email: data.email || "",
-            rua: data.address?.split("\n")[0] || data.address || "",
-            numero: data.number || "",
-            bairro: data.neighborhood || "",
-            cidade: data.city || "",
-            uf: data.state || "",
-            cep: data.zip_code || "",
+
+            rua: data.rua || addressParts.rua || "",
+            numero: data.numero || addressParts.numero || "",
+            complemento: data.complemento || addressParts.complemento || "",
+            bairro: data.bairro || addressParts.bairro || "",
+            cidade: data.cidade || "",
+            uf: data.uf || "",
+            cep: data.cep || "",
+
             locationLink: data.location_link || "",
             horarios: horariosFormatados, // Usando horários formatados
             tempoMedioPreparo: data.delivery_time?.replace(" min", "") || "30",
@@ -473,89 +569,8 @@ export function EstabelecimentoScreen() {
     setPhotos((prev) => prev.filter((_, i) => i !== index))
   }
 
-  const [isLoadingCep, setIsLoadingCep] = useState(false)
-
-  const consultarCEP = async (cep: string) => {
-    if (!cep || cep.length < 8) return
-
-    try {
-      setIsLoadingCep(true)
-      const cepLimpo = cep.replace(/\D/g, "")
-
-      if (cepLimpo.length !== 8) {
-        toast({
-          title: "CEP inválido",
-          description: "O CEP deve conter 8 dígitos",
-          variant: "destructive",
-        })
-        return
-      }
-
-      const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`)
-      const data = await response.json()
-
-      if (data.erro) {
-        toast({
-          title: "CEP não encontrado",
-          description: "Verifique o CEP informado",
-          variant: "destructive",
-        })
-        return
-      }
-
-      // Preencher campos automaticamente
-      setFormData((prev) => ({
-        ...prev,
-        rua: data.logradouro || prev.rua,
-        bairro: data.bairro || prev.bairro,
-        cidade: data.localidade || prev.cidade,
-        uf: data.uf || prev.uf,
-      }))
-
-      toast({
-        title: "CEP consultado com sucesso",
-        description: "Endereço preenchido automaticamente",
-      })
-    } catch (error) {
-      console.error("[v0] EstabelecimentoScreen: Erro ao consultar CEP:", error)
-      toast({
-        title: "Erro ao consultar CEP",
-        description: "Tente novamente mais tarde",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoadingCep(false)
-    }
-  }
-
-  const validateBasicForm = () => {
-    const errors: string[] = []
-
-    if (!formData.nomeFantasia?.trim()) errors.push("Nome da empresa é obrigatório")
-    if (!formData.cnpj?.trim()) errors.push("CNPJ é obrigatório")
-    if (!formData.telefone?.trim()) errors.push("Telefone é obrigatório")
-    if (!formData.email?.trim()) errors.push("E-mail é obrigatório")
-    if (!formData.rua?.trim()) errors.push("Rua é obrigatória")
-    if (!formData.numero?.trim()) errors.push("Número é obrigatório")
-    if (!formData.bairro?.trim()) errors.push("Bairro é obrigatório")
-    if (!formData.cidade?.trim()) errors.push("Cidade é obrigatória")
-    if (!formData.uf?.trim()) errors.push("UF é obrigatório")
-    if (!formData.cep?.trim()) errors.push("CEP é obrigatório")
-
-    if (errors.length > 0) {
-      toast({
-        title: "Campos obrigatórios não preenchidos",
-        description: errors.join(", "),
-        variant: "destructive",
-      })
-      return false
-    }
-
-    return true
-  }
-
   const handleSave = async () => {
-    if (!validateBasicForm()) {
+    if (!validateRequiredFields()) {
       return
     }
 
@@ -926,44 +941,13 @@ export function EstabelecimentoScreen() {
                       Endereço e Localização
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      <div className="md:col-span-2 space-y-4">
-                        <Label htmlFor="cep">CEP *</Label>
-                        <div className="flex gap-2">
-                          <Input
-                            id="cep"
-                            value={formData.cep}
-                            onChange={(e) => {
-                              const value = e.target.value.replace(/\D/g, "").replace(/(\d{5})(\d{3})/, "$1-$2")
-                              setFormData({ ...formData, cep: value })
-                            }}
-                            placeholder="00000-000"
-                            maxLength={9}
-                            className="flex-1"
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => consultarCEP(formData.cep)}
-                            disabled={isLoadingCep || !formData.cep}
-                            className="px-3"
-                          >
-                            {isLoadingCep ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Search className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div>
-                        <Label htmlFor="rua">Rua *</Label>
+                      <div className="md:col-span-2 space-y-2">
+                        <Label htmlFor="rua">Rua/Avenida *</Label>
                         <Input
                           id="rua"
                           value={formData.rua}
-                          onChange={(e) => setFormData({ ...formData, rua: e.target.value })}
-                          placeholder="Nome da rua"
-                          required
+                          onChange={(e) => setFormData((prev) => ({ ...prev, rua: e.target.value }))}
+                          placeholder="Nome da rua ou avenida"
                         />
                       </div>
 
@@ -1016,6 +1000,36 @@ export function EstabelecimentoScreen() {
                           placeholder="SP"
                           maxLength={2}
                         />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="cep">CEP *</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="cep"
+                            value={formatCEP(formData.cep)}
+                            onChange={(e) =>
+                              setFormData((prev) => ({ ...prev, cep: e.target.value.replace(/\D/g, "") }))
+                            }
+                            onBlur={(e) => {
+                              const cep = e.target.value.replace(/\D/g, "")
+                              if (cep.length === 8) {
+                                consultarCEP(cep)
+                              }
+                            }}
+                            placeholder="00000-000"
+                            maxLength={9}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => consultarCEP(formData.cep)}
+                            disabled={formData.cep.replace(/\D/g, "").length !== 8}
+                          >
+                            <Search className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
 
                       <div className="md:col-span-3 space-y-2">
