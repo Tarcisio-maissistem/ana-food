@@ -84,6 +84,7 @@ export async function GET(request: NextRequest) {
       link_cardapio: "",
       logo_url: null,
       photos: [],
+      minimum_order: "0.00",
     })
   } catch (error) {
     console.error("[v0] API Companies: Erro:", error)
@@ -151,6 +152,9 @@ export async function PUT(request: NextRequest) {
     const deliveryTime = body.tempo_medio_preparo || "30" // Default to 30 minutes
     console.log("[v0] API Companies: Delivery time criado:", deliveryTime)
 
+    const minimumOrder = body.minimum_order || body.pedido_minimo || "0.00" // Default to 0.00
+    console.log("[v0] API Companies: Minimum order criado:", minimumOrder)
+
     const allFields = {
       name: body.name || "",
       razao_social: body.razao_social || "",
@@ -172,6 +176,7 @@ export async function PUT(request: NextRequest) {
       address: fullAddress,
       working_hours: workingHours,
       delivery_time: deliveryTime,
+      minimum_order: minimumOrder,
       horarios: body.horarios || {},
       tempo_medio_preparo: body.tempo_medio_preparo || "30",
       retirada_local: body.retirada_local !== false,
