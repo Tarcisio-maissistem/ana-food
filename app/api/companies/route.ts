@@ -148,6 +148,9 @@ export async function PUT(request: NextRequest) {
 
     console.log("[v0] API Companies: Working hours criado:", workingHours)
 
+    const deliveryTime = body.tempo_medio_preparo || "30" // Default to 30 minutes
+    console.log("[v0] API Companies: Delivery time criado:", deliveryTime)
+
     const allFields = {
       name: body.name || "",
       razao_social: body.razao_social || "",
@@ -167,7 +170,8 @@ export async function PUT(request: NextRequest) {
       uf: body.uf || "",
       cep: body.cep || "",
       address: fullAddress,
-      working_hours: workingHours, // Add working_hours field
+      working_hours: workingHours,
+      delivery_time: deliveryTime,
       horarios: body.horarios || {},
       tempo_medio_preparo: body.tempo_medio_preparo || "30",
       retirada_local: body.retirada_local !== false,
