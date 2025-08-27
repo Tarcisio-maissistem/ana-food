@@ -52,6 +52,21 @@ const formatCEP = (cep: string) => {
   return cleaned
 }
 
+const formatMoney = (value: string) => {
+  if (!value) return ""
+  const numericValue = Number.parseFloat(value.replace(/[^\d,.-]/g, "").replace(",", "."))
+  if (isNaN(numericValue)) return ""
+  return numericValue.toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
+
+const parseMoney = (value: string) => {
+  if (!value) return ""
+  return value.replace(/[^\d,.-]/g, "").replace(",", ".")
+}
+
 export function EstabelecimentoScreen() {
   const [empresa, setEmpresa] = useState<EmpresaData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -232,110 +247,59 @@ export function EstabelecimentoScreen() {
 
   const loadEmpresaData = async () => {
     try {
-      console.log("[v0] EstabelecimentoScreen: Iniciando carregamento dos dados da empresa...")
-      setLoading(true)
-
+      console.log("[v0] EstabelecimentoScreen: Carregando dados da empresa...")
       const response = await fetch("/api/companies", {
         headers: {
           "x-user-email": "tarcisiorp16@gmail.com",
         },
       })
 
-      console.log("[v0] EstabelecimentoScreen: Response status:", response.status)
-
       if (response.ok) {
         const data = await response.json()
-        console.log(
-          "[v0] EstabelecimentoScreen: Dados recebidos da API:",
-          JSON.stringify(data).substring(0, 500) + "...",
-        )
+        console.log("[v0] EstabelecimentoScreen: Dados recebidos:", data)
 
-        if (data && Object.keys(data).length > 0) {
-          console.log("[v0] EstabelecimentoScreen: Dados válidos encontrados, atualizando formulário")
+        // Parse address from single field to individual components
+        //const addressParts = parseAddress(data.address || "")
 
-          const addressParts = {
-            rua: "",
-            numero: "",
-            complemento: "",
-            bairro: "",
-            cidade: "",
-            uf: "",
-            cep: "",
-          }
-
-          if (data.address) {
-            // Try to parse the address string into components
-            const addressLines = data.address.split("\n")
-            if (addressLines.length > 0) {
-              // First line usually contains street and number
-              const firstLine = addressLines[0]
-              const streetMatch = firstLine.match(/^(.+?)\s+(\d+.*)$/)
-              if (streetMatch) {
-                addressParts.rua = streetMatch[1]
-                addressParts.numero = streetMatch[2]
-              } else {
-                addressParts.rua = firstLine
-              }
-
-              // Second line might contain neighborhood/complement
-              if (addressLines.length > 1) {
-                addressParts.bairro = addressLines[1]
-              }
-            }
-          }
-
-          let horariosFormatados = formData.horarios // usar horários padrão como fallback
-
-          if (data.horarios && typeof data.horarios === "object") {
-            // Se horarios existe como objeto JSON, usar diretamente
-            horariosFormatados = data.horarios
-          } else if (data.working_hours && typeof data.working_hours === "string") {
-            // Se working_hours existe como string, tentar parsear ou usar padrão
-            console.log(
-              "[v0] EstabelecimentoScreen: Usando horários padrão pois working_hours é string:",
-              data.working_hours,
-            )
-          }
-
-          setFormData({
-            ...formData,
-            nomeFantasia: data.name || "",
-            razaoSocial: data.legal_name || data.name || "",
-            cnpj: data.cnpj || "",
-            telefone: data.phone || "",
-            email: data.email || "",
-
-            rua: data.rua || addressParts.rua || "",
-            numero: data.numero || addressParts.numero || "",
-            complemento: data.complemento || addressParts.complemento || "",
-            bairro: data.bairro || addressParts.bairro || "",
-            cidade: data.cidade || "",
-            uf: data.uf || "",
-            cep: data.cep || "",
-
-            locationLink: data.location_link || "",
-            horarios: horariosFormatados, // Usando horários formatados
-            tempoMedioPreparo: data.delivery_time?.replace(" min", "") || "30",
-            retiradaLocal: data.retiradaLocal,
-            entregaPropria: data.entregaPropria,
-            entregaMotoboy: false,
-            aceiteAutomatico: data.aceite_automatico || false,
-            linkCardapio: data.linkCardapio,
-          })
-
-          console.log("[v0] EstabelecimentoScreen: FormData atualizado com sucesso")
-        }
+        setFormData({
+          nomeFantasia: data.name || "",
+          razaoSocial: data.legal_name || data.name || "",
+          cnpj: data.cnpj || "",
+          cpf: data.cpf || "",
+          telefone: data.phone || "",
+          whatsapp: data.whatsapp || "",
+          email: data.email || "",
+          rua: data.rua || "",
+          numero: data.numero || "",
+          complemento: data.complemento || "",
+          bairro: data.bairro || "",
+          cidade: data.cidade || "",
+          uf: data.uf || "",
+          cep: data.cep || "",
+          locationLink: data.location_link || "",
+          tempoMedioPreparo: data.delivery_time?.replace(" min", "") || "30",
+          retiradaLocal: data.retiradaLocal,
+          entregaPropria: data.entregaPropria,
+          entregaMotoboy: false,
+          aceiteAutomatico: data.aceite_automatico || false,
+          linkCardapio: data.linkCardapio || "",
+          horarios: data.horarios
+            ? typeof data.horarios === "string"
+              ? JSON.parse(data.horarios)
+              : data.horarios
+            : {
+                segunda: { abertura: "10:00", fechamento: "14:00", fechado: false },
+                terca: { abertura: "10:00", fechamento: "14:00", fechado: false },
+                quarta: { abertura: "10:00", fechamento: "14:00", fechado: false },
+                quinta: { abertura: "10:00", fechamento: "14:00", fechado: false },
+                sexta: { abertura: "10:00", fechamento: "14:00", fechado: false },
+                sabado: { abertura: "10:00", fechamento: "14:00", fechado: false },
+                domingo: { abertura: "10:00", fechamento: "14:00", fechado: true },
+              },
+        })
       }
     } catch (error) {
       console.error("[v0] EstabelecimentoScreen: Erro ao carregar dados:", error)
-      toast({
-        title: "Erro",
-        description: "Erro ao carregar dados da empresa",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-      console.log("[v0] EstabelecimentoScreen: Carregamento finalizado")
     }
   }
 
@@ -1335,11 +1299,12 @@ export function EstabelecimentoScreen() {
                         <Label htmlFor="price">Valor da Entrega (R$)</Label>
                         <Input
                           id="price"
-                          type="number"
-                          step="0.01"
-                          value={bairroForm.price}
-                          onChange={(e) => setBairroForm({ ...bairroForm, price: e.target.value })}
-                          placeholder="0.00"
+                          value={bairroForm.price ? `R$ ${formatMoney(bairroForm.price)}` : ""}
+                          onChange={(e) => {
+                            const rawValue = parseMoney(e.target.value)
+                            setBairroForm({ ...bairroForm, price: rawValue })
+                          }}
+                          placeholder="R$ 0,00"
                         />
                       </div>
                       <div className="flex items-center space-x-2">
@@ -1373,9 +1338,7 @@ export function EstabelecimentoScreen() {
                       <div className="flex items-center gap-3">
                         <div>
                           <p className="font-medium">{bairro.zone}</p>
-                          <p className="text-sm text-muted-foreground">
-                            R$ {Number.parseFloat(bairro.price).toFixed(2)}
-                          </p>
+                          <p className="text-sm text-muted-foreground">R$ {formatMoney(bairro.price.toString())}</p>
                         </div>
                         <Badge variant={bairro.active ? "default" : "secondary"}>
                           {bairro.active ? "Ativo" : "Inativo"}

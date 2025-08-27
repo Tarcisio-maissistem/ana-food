@@ -9,42 +9,71 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const body = await request.json()
     const { id } = params
 
+    console.log("[v0] Delivery Zones Update API: Iniciando atualização para ID:", id)
+    console.log("[v0] Delivery Zones Update API: Dados recebidos:", body)
+
     // Buscar usuário
     const { data: user } = await supabase.from("users").select("id").eq("email", userEmail).single()
 
     if (!user) {
+      console.log("[v0] Delivery Zones Update API: Usuário não encontrado")
       return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 })
     }
 
-    // Buscar empresa do usuário
-    const { data: company } = await supabase.from("companies").select("id").eq("user_id", user.id).single()
+    console.log("[v0] Delivery Zones Update API: Usuário encontrado:", user.id)
+
+    let company = null
+
+    // First try to find company by CNPJ (works for existing companies)
+    const { data: companiesByCNPJ } = await supabase
+      .from("companies")
+      .select("id")
+      .not("cnpj", "is", null)
+      .neq("cnpj", "")
+
+    if (companiesByCNPJ && companiesByCNPJ.length > 0) {
+      company = companiesByCNPJ[0]
+      console.log("[v0] Delivery Zones Update API: Empresa encontrada via CNPJ:", company.id)
+    } else {
+      // Fallback to user_id lookup
+      const { data: companyByUser } = await supabase.from("companies").select("id").eq("user_id", user.id).single()
+
+      company = companyByUser
+      console.log("[v0] Delivery Zones Update API: Empresa encontrada via user_id:", company?.id)
+    }
 
     if (!company) {
+      console.log("[v0] Delivery Zones Update API: Empresa não encontrada")
       return NextResponse.json({ error: "Empresa não encontrada" }, { status: 404 })
     }
 
-    // Atualizar bairro de entrega
     const { data: zone, error } = await supabase
       .from("delivery_zones")
       .update({
         zone: body.zone,
-        price: body.price,
+        price: Number.parseFloat(body.price) || 0,
         active: body.active,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)
       .eq("company_id", company.id)
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) {
-      console.error("Erro ao atualizar bairro:", error)
-      return NextResponse.json({ error: "Erro ao atualizar bairro" }, { status: 500 })
+      console.error("[v0] Delivery Zones Update API: Erro ao atualizar bairro:", error)
+      return NextResponse.json({ error: "Erro ao atualizar bairro: " + error.message }, { status: 500 })
     }
 
+    if (!zone) {
+      console.log("[v0] Delivery Zones Update API: Bairro não encontrado para atualização")
+      return NextResponse.json({ error: "Bairro não encontrado" }, { status: 404 })
+    }
+
+    console.log("[v0] Delivery Zones Update API: Bairro atualizado com sucesso:", zone)
     return NextResponse.json(zone)
   } catch (error) {
-    console.error("Erro na API delivery-zones PUT:", error)
+    console.error("[v0] Delivery Zones Update API: Erro na API delivery-zones PUT:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
