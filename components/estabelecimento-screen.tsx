@@ -300,6 +300,8 @@ export function EstabelecimentoScreen() {
       }
     } catch (error) {
       console.error("[v0] EstabelecimentoScreen: Erro ao carregar dados:", error)
+    } finally {
+      setLoading(false)
     }
   }
 
