@@ -38,6 +38,7 @@ import {
 import { toast } from "react-hot-toast"
 import { useUser } from "./main-dashboard"
 import { EstabelecimentoScreen } from "./estabelecimento-screen"
+import QZTrayManager from "./qz-tray-manager"
 
 interface EstablishmentData {
   name: string
@@ -879,6 +880,14 @@ const SettingsScreen = () => {
     loadPrintLocations()
   }, [])
 
+  const [formData, setFormData] = useState({
+    name: empresaData?.name || "",
+    cnpj: empresaData?.cnpj || "",
+    address: empresaData?.address || "",
+    phone: empresaData?.phone || "",
+    email: empresaData?.email || "",
+  })
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -1040,90 +1049,103 @@ const SettingsScreen = () => {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-semibold">Configuração de Impressoras</h2>
-              <p className="text-sm text-muted-foreground">Configure as impressoras por setor de impressão</p>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                onClick={syncWithQzTray}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2 bg-transparent"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Sincronizar QZ Tray
-              </Button>
-              <Dialog open={isPrintLocationDialogOpen} onOpenChange={setIsPrintLocationDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm" onClick={() => setSelectedPrintLocation(null)}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Novo Setor
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>{selectedPrintLocation ? "Editar Setor" : "Novo Setor de Impressão"}</DialogTitle>
-                  </DialogHeader>
-                  <PrintLocationDialog
-                    printLocation={selectedPrintLocation}
-                    onSave={handleSavePrintLocation}
-                    onClose={() => setIsPrintLocationDialogOpen(false)}
-                    isLoading={isPrintLocationSaving}
-                    availablePrinters={availablePrinters}
-                  />
-                </DialogContent>
-              </Dialog>
+              <p className="text-sm text-muted-foreground">Configure as impressoras e teste a impressão de pedidos</p>
             </div>
           </div>
 
-          {/* QZ Tray Status */}
-          <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-            <div className={`w-2 h-2 rounded-full ${qzTrayConnected ? "bg-green-500" : "bg-red-500"}`} />
-            <span className="text-sm">QZ Tray: {qzTrayConnected ? "Conectado" : "Desconectado"}</span>
-            {availablePrinters.length > 0 && (
-              <span className="text-sm text-muted-foreground ml-2">
-                ({availablePrinters.length} impressoras disponíveis)
-              </span>
-            )}
-          </div>
+          {/* QZ Tray Manager Component */}
+          <QZTrayManager companyData={formData} />
 
-          {/* Print Locations List */}
-          <div className="grid gap-4">
-            {printLocationsList.map((location) => (
-              <div key={location.id} className="border rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-medium">{location.name}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Impressora: {location.printer_name || "Não configurada"}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedPrintLocation(location)
-                        setIsPrintLocationDialogOpen(true)
-                      }}
-                    >
-                      <Edit className="w-4 h-4" />
+          {/* Existing Print Locations Management */}
+          <div className="border-t pt-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-medium">Setores de Impressão</h3>
+                <p className="text-sm text-muted-foreground">Configure as impressoras por setor</p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={syncWithQzTray}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2 bg-transparent"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Sincronizar QZ Tray
+                </Button>
+                <Dialog open={isPrintLocationDialogOpen} onOpenChange={setIsPrintLocationDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" onClick={() => setSelectedPrintLocation(null)}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Novo Setor
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleDeletePrintLocation(location.id)}>
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>{selectedPrintLocation ? "Editar Setor" : "Novo Setor de Impressão"}</DialogTitle>
+                    </DialogHeader>
+                    <PrintLocationDialog
+                      printLocation={selectedPrintLocation}
+                      onSave={handleSavePrintLocation}
+                      onClose={() => setIsPrintLocationDialogOpen(false)}
+                      isLoading={isPrintLocationSaving}
+                      availablePrinters={availablePrinters}
+                    />
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </div>
+
+            {/* QZ Tray Status */}
+            <div className="flex items-center gap-2 p-3 bg-muted rounded-lg mb-4">
+              <div className={`w-2 h-2 rounded-full ${qzTrayConnected ? "bg-green-500" : "bg-red-500"}`} />
+              <span className="text-sm">QZ Tray: {qzTrayConnected ? "Conectado" : "Desconectado"}</span>
+              {availablePrinters.length > 0 && (
+                <span className="text-sm text-muted-foreground ml-2">
+                  ({availablePrinters.length} impressoras disponíveis)
+                </span>
+              )}
+            </div>
+
+            {/* Print Locations List */}
+            <div className="grid gap-4">
+              {printLocationsList.map((location) => (
+                <div key={location.id} className="border rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-medium">{location.name}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Impressora: {location.printer_name || "Não configurada"}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedPrintLocation(location)
+                          setIsPrintLocationDialogOpen(true)
+                        }}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleDeletePrintLocation(location.id)}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-
-          {printLocationsList.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              <Printer className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>Nenhum setor de impressão configurado</p>
-              <p className="text-sm">Clique em "Novo Setor" para começar</p>
+              ))}
             </div>
-          )}
+
+            {printLocationsList.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                <Printer className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>Nenhum setor de impressão configurado</p>
+                <p className="text-sm">Clique em "Novo Setor" para começar</p>
+              </div>
+            )}
+          </div>
         </TabsContent>
 
         <TabsContent value="whatsapp">
