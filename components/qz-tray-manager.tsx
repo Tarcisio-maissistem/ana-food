@@ -75,10 +75,23 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
 
   const checkConnection = async () => {
     try {
+      console.log("[v0] Verificando conexão QZ Tray...")
+
+      if (!window.qz) {
+        console.error("[v0] QZ Tray script não está carregado")
+        setIsConnected(false)
+        return
+      }
+
       const connected = await qzTrayService.connect()
+      console.log("[v0] Resultado da conexão:", connected)
       setIsConnected(connected)
+
       if (connected) {
+        console.log("[v0] Conexão estabelecida, carregando impressoras...")
         await loadPrinters()
+      } else {
+        console.error("[v0] Falha ao conectar com QZ Tray")
       }
     } catch (error) {
       console.error("[v0] Erro ao verificar conexão QZ Tray:", error)
@@ -89,16 +102,25 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
   const loadPrinters = async () => {
     setLoading(true)
     try {
+      console.log("[v0] Iniciando carregamento de impressoras...")
       const printerList = await qzTrayService.listPrinters()
-      setPrinters(printerList)
-      console.log("[v0] Impressoras carregadas:", printerList)
+      console.log("[v0] Lista de impressoras recebida:", printerList)
 
-      if (printerList.length > 0 && !selectedPrinter) {
-        setSelectedPrinter(printerList[0])
-        qzTrayService.setSelectedPrinter(printerList[0])
+      setPrinters(printerList)
+
+      if (printerList.length > 0) {
+        if (!selectedPrinter) {
+          console.log("[v0] Selecionando primeira impressora automaticamente:", printerList[0])
+          setSelectedPrinter(printerList[0])
+          qzTrayService.setSelectedPrinter(printerList[0])
+        }
+      } else {
+        console.warn("[v0] Nenhuma impressora encontrada")
+        setSelectedPrinter("")
       }
     } catch (error) {
       console.error("[v0] Erro ao carregar impressoras:", error)
+      setPrinters([])
     } finally {
       setLoading(false)
     }
