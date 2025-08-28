@@ -1,8 +1,6 @@
 "use client"
 
 import type React from "react"
-import { qz } from "qz-tray" // Declare the qz variable
-
 import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -551,9 +549,8 @@ const SettingsScreen = () => {
 
   const checkQzTrayConnection = async () => {
     try {
-      // @ts-ignore
-      if (typeof qz !== "undefined") {
-        // @ts-ignore
+      if (typeof window !== "undefined" && (window as any).qz) {
+        const qz = (window as any).qz
         await qz.websocket.connect()
         setQzTrayConnected(true)
         console.log("[v0] QZ Tray conectado com sucesso")
@@ -580,7 +577,7 @@ const SettingsScreen = () => {
     }
 
     try {
-      // @ts-ignore
+      const qz = (window as any).qz
       const printerList = await qz.printers.find()
       console.log("[v0] Impressoras do Windows encontradas:", printerList)
       return printerList
