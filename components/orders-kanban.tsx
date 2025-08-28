@@ -125,6 +125,9 @@ export function OrdersKanban() {
   const [qzTrayConnected, setQzTrayConnected] = useState(false)
   const [qzTrayStatus, setQzTrayStatus] = useState("Verificando...")
 
+  const [printerSettings, setPrinterSettings] = useState(null)
+  const [companyData, setCompanyData] = useState(null)
+
   const timeOptions = [5, 10, 15, 30, 45, 60, 75, 90, 105, 120]
 
   const handleDeliveryTimeChange = (minutes: number) => {
@@ -279,6 +282,7 @@ export function OrdersKanban() {
     }
   }
 
+  // Updated printOrder function to include printer settings and company data
   const printOrder = async (order: Order) => {
     try {
       console.log("[v0] Imprimindo pedido:", order.number)
@@ -286,6 +290,11 @@ export function OrdersKanban() {
       // Check if QZ Tray is connected
       if (!qzTrayConnected) {
         toast.error("QZ Tray não está conectado. Configure as impressoras nas configurações.")
+        return
+      }
+
+      if (!printerSettings?.defaultPrinter) {
+        toast.error("Nenhuma impressora padrão configurada. Configure nas configurações de impressora.")
         return
       }
 
@@ -316,7 +325,7 @@ export function OrdersKanban() {
         observations: order.observations,
       }
 
-      await qzTrayService.printOrder(orderData)
+      await qzTrayService.printOrder(orderData, companyData)
       toast.success(`Pedido #${order.number} enviado para impressão`)
     } catch (error) {
       console.error("[v0] Erro ao imprimir pedido:", error)
@@ -531,9 +540,57 @@ export function OrdersKanban() {
     }
   }
 
+  const loadPrinterSettings = async () => {
+    try {
+      const response = await fetch("/api/printer-settings", {
+        headers: {
+          "x-user-email": "tarcisiorp16@gmail.com",
+        },
+      })
+
+      if (response.ok) {
+        const settings = await response.json()
+        setPrinterSettings(settings)
+
+        // Set the default printer in QZ Tray service
+        if (settings.defaultPrinter) {
+          qzTrayService.setSelectedPrinter(settings.defaultPrinter)
+          qzTrayService.updatePrintSettings({
+            showLogo: settings.showLogo,
+            showTitle: settings.showTitle,
+            showAddress: settings.showAddress,
+            showPhone: settings.showPhone,
+          })
+        }
+      }
+    } catch (error) {
+      console.error("[v0] Erro ao carregar configurações de impressora:", error)
+    }
+  }
+
+  const loadCompanyData = async () => {
+    try {
+      const response = await fetch("/api/companies", {
+        headers: {
+          "x-user-email": "tarcisiorp16@gmail.com",
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.length > 0) {
+          setCompanyData(data[0])
+        }
+      }
+    } catch (error) {
+      console.error("[v0] Erro ao carregar dados da empresa:", error)
+    }
+  }
+
   useEffect(() => {
     validateQzTrayConnection()
-    loadOrders()
+    loadPrinterSettings()
+    loadCompanyData()
     const interval = setInterval(loadWhatsappAlerts, 60000)
     return () => clearInterval(interval)
   }, [])
