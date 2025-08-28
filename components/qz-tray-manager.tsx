@@ -28,40 +28,44 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
     showPhone: true,
   })
 
-  const [sampleOrder, setSampleOrder] = useState({
-    id: "PED-001",
-    customerName: "João Silva",
-    customerPhone: "(11) 99999-9999",
-    customerAddress: "Rua das Flores, 123 - Centro",
-    items: [
-      { name: "X-Burger", quantity: 2, price: 15.9, observations: "Sem cebola" },
-      { name: "Batata Frita", quantity: 1, price: 8.5, observations: "" },
-      { name: "Coca-Cola 350ml", quantity: 2, price: 4.5, observations: "" },
-    ],
-    subtotal: 48.8,
-    deliveryFee: 5.0,
-    total: 53.8,
-    paymentMethod: "Dinheiro",
-    change: 60.0,
-    observations: "Entregar no portão azul",
-  })
+  const [savingSettings, setSavingSettings] = useState(false)
 
-  // Load QZ Tray script and check connection on mount
   useEffect(() => {
-    // Auto-check connection on mount (no script loading needed)
+    loadPrinterSettings()
     checkConnection()
   }, [])
 
-  useEffect(() => {
-    const autoCheckConnection = async () => {
-      if (window.qz) {
-        await checkConnection()
-      }
-    }
+  const loadPrinterSettings = async () => {
+    try {
+      const response = await fetch("/api/printer-settings", {
+        headers: {
+          "x-user-email": "tarcisiorp16@gmail.com",
+        },
+      })
 
-    const timer = setTimeout(autoCheckConnection, 1000)
-    return () => clearTimeout(timer)
-  }, [])
+      if (response.ok) {
+        const settings = await response.json()
+        if (settings.defaultPrinter) {
+          setSelectedPrinter(settings.defaultPrinter)
+          qzTrayService.setSelectedPrinter(settings.defaultPrinter)
+        }
+        setPrintSettings({
+          showLogo: settings.showLogo,
+          showTitle: settings.showTitle,
+          showAddress: settings.showAddress,
+          showPhone: settings.showPhone,
+        })
+        qzTrayService.updatePrintSettings({
+          showLogo: settings.showLogo,
+          showTitle: settings.showTitle,
+          showAddress: settings.showAddress,
+          showPhone: settings.showPhone,
+        })
+      }
+    } catch (error) {
+      console.error("Erro ao carregar configurações de impressora:", error)
+    }
+  }
 
   const checkConnection = async () => {
     try {
@@ -138,7 +142,6 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
   const handlePrinterSelect = (printerName: string) => {
     setSelectedPrinter(printerName)
     qzTrayService.setSelectedPrinter(printerName)
-    console.log("[v0] Impressora selecionada:", printerName)
   }
 
   const handleSettingChange = (setting: string, value: boolean) => {
@@ -215,6 +218,52 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
 
     return preview
   }
+
+  const savePrinterSettings = async () => {
+    setSavingSettings(true)
+    try {
+      const response = await fetch("/api/printer-settings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-email": "tarcisiorp16@gmail.com",
+        },
+        body: JSON.stringify({
+          defaultPrinter: selectedPrinter,
+          ...printSettings,
+        }),
+      })
+
+      if (response.ok) {
+        alert("Configurações salvas com sucesso!")
+      } else {
+        throw new Error("Erro ao salvar configurações")
+      }
+    } catch (error) {
+      console.error("Erro ao salvar configurações:", error)
+      alert("Erro ao salvar configurações: " + error.message)
+    } finally {
+      setSavingSettings(false)
+    }
+  }
+
+  const [sampleOrder, setSampleOrder] = useState({
+    id: "PED-001",
+    customerName: "João Silva",
+    customerPhone: "(11) 99999-9999",
+    customerAddress: "Rua das Flores, 123 - Centro",
+    items: [
+      { name: "X-Burger", quantity: 2, price: 15.9, observations: "Sem cebola" },
+      { name: "Batata Frita", quantity: 1, price: 8.5, observations: "" },
+      { name: "Coca-Cola 350ml", quantity: 2, price: 4.5, observations: "" },
+    ],
+    subtotal: 48.8,
+    deliveryFee: 5.0,
+    total: 53.8,
+    paymentMethod: "Dinheiro",
+    change: 60.0,
+    observations: "Entregar no portão azul",
+  })
 
   return (
     <div className="space-y-6">
@@ -300,6 +349,17 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
               </p>
             </div>
           )}
+
+          <div className="flex justify-end">
+            <Button
+              onClick={savePrinterSettings}
+              disabled={savingSettings || !selectedPrinter}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {savingSettings ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Salvar Configurações
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

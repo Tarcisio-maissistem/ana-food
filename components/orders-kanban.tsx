@@ -2,6 +2,7 @@
 import { useSettings } from "@/hooks/use-settings"
 import { useUser } from "./main-dashboard" // Importando contexto de usuário
 import type React from "react"
+import { RefreshCw } from "lucide-react"
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -120,6 +121,9 @@ export function OrdersKanban() {
   const [deliveryTime, setDeliveryTime] = useState(getSetting("delivery_time", { minutes: 30 }).minutes)
   const [pickupTime, setPickupTime] = useState(getSetting("pickup_time", { minutes: 45 }).minutes)
   const [searchTerm, setSearchTerm] = useState("")
+
+  const [qzTrayConnected, setQzTrayConnected] = useState(false)
+  const [qzTrayStatus, setQzTrayStatus] = useState("Verificando...")
 
   const timeOptions = [5, 10, 15, 30, 45, 60, 75, 90, 105, 120]
 
@@ -279,18 +283,12 @@ export function OrdersKanban() {
     try {
       console.log("[v0] Imprimindo pedido:", order.number)
 
-      console.log("[v0] Verificando conexão QZ Tray...")
-      const isConnected = qzTrayService.isQzTrayConnected()
-      console.log("[v0] QZ Tray conectado:", isConnected)
-
       // Check if QZ Tray is connected
-      if (!isConnected) {
-        console.log("[v0] QZ Tray não conectado, mostrando erro")
+      if (!qzTrayConnected) {
         toast.error("QZ Tray não está conectado. Configure as impressoras nas configurações.")
         return
       }
 
-      console.log("[v0] Formatando dados do pedido...")
       // Format order data for printing
       const orderData = {
         id: order.number,
@@ -318,12 +316,7 @@ export function OrdersKanban() {
         observations: order.observations,
       }
 
-      console.log("[v0] Dados do pedido formatados:", orderData)
-      console.log("[v0] Enviando para QZ Tray service...")
-
       await qzTrayService.printOrder(orderData)
-
-      console.log("[v0] Impressão enviada com sucesso")
       toast.success(`Pedido #${order.number} enviado para impressão`)
     } catch (error) {
       console.error("[v0] Erro ao imprimir pedido:", error)
@@ -448,15 +441,10 @@ export function OrdersKanban() {
     try {
       const selectedOrdersList = orders.filter((order) => selectedOrders.has(order.id))
 
-      if (!qzTrayService.isQzTrayConnected()) {
+      if (!qzTrayConnected) {
         toast.error("QZ Tray não está conectado. Configure as impressoras nas configurações.")
         return
       }
-
-      console.log(
-        "[v0] Imprimindo pedidos selecionados:",
-        selectedOrdersList.map((o) => o.number),
-      )
 
       // Print each selected order
       for (const order of selectedOrdersList) {
@@ -469,7 +457,7 @@ export function OrdersKanban() {
       setSelectedOrders(new Set())
       setShowBulkActions(false)
     } catch (error) {
-      console.error("[v0] Erro na impressão em lote:", error)
+      console.error("Erro na impressão em lote:", error)
       toast.error("Erro ao imprimir pedidos em lote")
     }
   }
@@ -520,7 +508,25 @@ export function OrdersKanban() {
     return false
   })
 
+  const validateQzTrayConnection = async () => {
+    try {
+      const connected = await qzTrayService.connect()
+      if (connected === true || (connected && connected.success === true)) {
+        setQzTrayConnected(true)
+        setQzTrayStatus("Conectado")
+      } else {
+        setQzTrayConnected(false)
+        setQzTrayStatus("Desconectado")
+      }
+    } catch (error) {
+      console.error("Erro ao validar conexão QZ Tray:", error)
+      setQzTrayConnected(false)
+      setQzTrayStatus("Erro de conexão")
+    }
+  }
+
   useEffect(() => {
+    validateQzTrayConnection()
     loadOrders()
     const interval = setInterval(loadWhatsappAlerts, 60000)
     return () => clearInterval(interval)
@@ -543,6 +549,21 @@ export function OrdersKanban() {
       <div className="sticky top-0 bg-white/95 backdrop-blur-sm z-10 border-b pb-1">
         <div className="flex flex-col items-start sm:flex-row py-1 mx-0 my-0 px-0 justify-center gap-3 bg-slate-100 text-sm">
           <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-lg border">
+              <Printer className={`w-3 h-3 ${qzTrayConnected ? "text-green-600" : "text-red-600"}`} />
+              <span className={`text-xs font-medium ${qzTrayConnected ? "text-green-600" : "text-red-600"}`}>
+                {qzTrayStatus}
+              </span>
+              <Button
+                onClick={validateQzTrayConnection}
+                variant="outline"
+                size="sm"
+                className="h-5 px-1 text-xs bg-transparent"
+              >
+                <RefreshCw className="w-3 h-3" />
+              </Button>
+            </div>
+
             <div className="flex items-center gap-2">
               <Store className="w-3 h-3" />
               <Switch checked={storeOpen} onCheckedChange={toggleStoreStatus} />
