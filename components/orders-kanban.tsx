@@ -26,6 +26,7 @@ import {
   ChevronUp,
 } from "lucide-react"
 import { toast } from "react-hot-toast"
+import qzTrayService from "@/lib/qz-tray-service"
 
 interface OrderItem {
   id?: string
@@ -63,6 +64,30 @@ const statusColumns = [
   { id: "concluido", title: "Concluídos", color: "bg-gray-500" },
   { id: "cancelado", title: "Cancelado", color: "bg-red-500" },
 ]
+
+const bulkChangeStatus = async (status: Order["status"], orderIds: string[]) => {
+  try {
+    const response = await fetch("/api/orders/bulk", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ orderIds, status }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.text()
+      console.error("Erro na resposta da API:", errorData)
+      throw new Error("Erro ao atualizar status em lote")
+    }
+
+    console.log("Status atualizado com sucesso para:", status)
+    toast.success(`Status de ${orderIds.length} pedidos alterado para ${status}`)
+  } catch (error) {
+    console.error("Erro ao atualizar status em lote:", error)
+    toast.error("Erro ao atualizar status de pedidos em lote")
+  }
+}
 
 export function OrdersKanban() {
   const { user } = useUser() // Obtendo usuário do contexto
@@ -250,8 +275,49 @@ export function OrdersKanban() {
     }
   }
 
-  const printOrder = (order: Order) => {
-    console.log("🖨️ Imprimindo pedido:", order.number)
+  const printOrder = async (order: Order) => {
+    try {
+      console.log("[v0] Imprimindo pedido:", order.number)
+
+      // Check if QZ Tray is connected
+      if (!qzTrayService.isQzTrayConnected()) {
+        toast.error("QZ Tray não está conectado. Configure as impressoras nas configurações.")
+        return
+      }
+
+      // Format order data for printing
+      const orderData = {
+        id: order.number,
+        customerName: order.customerName,
+        customerPhone: order.phone,
+        customerAddress: order.address,
+        items: order.items.map((item) => ({
+          name: item.name || item.nome || "Item",
+          quantity: item.quantity || item.quantidade || 1,
+          price: item.price || item.preco || 0,
+          observations: item.observations || item.observacoes || "",
+        })),
+        subtotal: order.items.reduce(
+          (sum, item) => sum + (item.price || item.preco || 0) * (item.quantity || item.quantidade || 1),
+          0,
+        ),
+        deliveryFee: order.deliveryFee || 0,
+        total:
+          order.items.reduce(
+            (sum, item) => sum + (item.price || item.preco || 0) * (item.quantity || item.quantidade || 1),
+            0,
+          ) + (order.deliveryFee || 0),
+        paymentMethod: order.paymentMethod,
+        type: order.type,
+        observations: order.observations,
+      }
+
+      await qzTrayService.printOrder(orderData)
+      toast.success(`Pedido #${order.number} enviado para impressão`)
+    } catch (error) {
+      console.error("[v0] Erro ao imprimir pedido:", error)
+      toast.error("Erro ao imprimir pedido: " + error.message)
+    }
   }
 
   const loadOrders = async () => {
@@ -367,30 +433,33 @@ export function OrdersKanban() {
     setShowBulkActions(newSelected.size > 0)
   }
 
-  const bulkPrint = () => {
-    const selectedOrdersList = orders.filter((order) => selectedOrders.has(order.id))
-    console.log(
-      "🖨️ Imprimindo pedidos selecionados:",
-      selectedOrdersList.map((o) => o.number),
-    )
-    toast.success(`${selectedOrdersList.length} pedidos enviados para impressão`)
-    setSelectedOrders(new Set())
-    setShowBulkActions(false)
-  }
-
-  const bulkChangeStatus = async (newStatus: Order["status"]) => {
-    const selectedOrdersList = orders.filter((order) => selectedOrders.has(order.id))
-
+  const bulkPrint = async () => {
     try {
-      await Promise.all(selectedOrdersList.map((order) => updateOrderStatus(order.id, newStatus)))
+      const selectedOrdersList = orders.filter((order) => selectedOrders.has(order.id))
 
-      setOrders((prev) => prev.map((order) => (selectedOrders.has(order.id) ? { ...order, status: newStatus } : order)))
+      if (!qzTrayService.isQzTrayConnected()) {
+        toast.error("QZ Tray não está conectado. Configure as impressoras nas configurações.")
+        return
+      }
 
-      toast.success(`${selectedOrdersList.length} pedidos atualizados para ${newStatus}`)
+      console.log(
+        "[v0] Imprimindo pedidos selecionados:",
+        selectedOrdersList.map((o) => o.number),
+      )
+
+      // Print each selected order
+      for (const order of selectedOrdersList) {
+        await printOrder(order)
+        // Small delay between prints to avoid overwhelming the printer
+        await new Promise((resolve) => setTimeout(resolve, 500))
+      }
+
+      toast.success(`${selectedOrdersList.length} pedidos enviados para impressão`)
       setSelectedOrders(new Set())
       setShowBulkActions(false)
     } catch (error) {
-      toast.error("Erro ao atualizar pedidos em lote")
+      console.error("[v0] Erro na impressão em lote:", error)
+      toast.error("Erro ao imprimir pedidos em lote")
     }
   }
 
@@ -555,7 +624,9 @@ export function OrdersKanban() {
                 </Button>
                 <select
                   className="text-xs border rounded px-1 py-0.5 h-6"
-                  onChange={(e) => e.target.value && bulkChangeStatus(e.target.value as Order["status"])}
+                  onChange={(e) =>
+                    e.target.value && bulkChangeStatus(e.target.value as Order["status"], Array.from(selectedOrders))
+                  }
                   defaultValue=""
                 >
                   <option value="">Alterar Status</option>
@@ -963,7 +1034,8 @@ export function OrdersKanban() {
                       {Array.isArray(selectedOrder.items)
                         ? (
                             selectedOrder.items.reduce(
-                              (sum, item) => sum + (item.price || 0) * (item.quantity || 0),
+                              (sum, item) =>
+                                sum + (item.price || item.preco || 0) * (item.quantity || item.quantidade || 0),
                               0,
                             ) + (selectedOrder.deliveryFee || 0)
                           ).toFixed(2)

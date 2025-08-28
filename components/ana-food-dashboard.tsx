@@ -27,6 +27,7 @@ import {
   Truck,
 } from "lucide-react"
 import { toast } from "react-hot-toast"
+import qzTrayService from "@/lib/qz-tray-service"
 
 // Tipos de dados
 interface OrderItem {
@@ -49,6 +50,7 @@ interface Order {
   type: "delivery" | "retirada"
   createdAt: Date
   estimatedTime?: number
+  phone?: string
 }
 
 // Dados para relatórios
@@ -172,8 +174,42 @@ export function AnaFoodDashboard() {
     }
   }
 
-  const printOrder = (order: Order) => {
-    console.log("🖨️ Imprimindo pedido:", order.number)
+  const printOrder = async (order: Order) => {
+    try {
+      console.log("[v0] Imprimindo pedido:", order.number)
+
+      if (!qzTrayService.isQzTrayConnected()) {
+        toast.error("QZ Tray não está conectado. Configure as impressoras nas configurações.")
+        return
+      }
+
+      const orderData = {
+        id: order.number,
+        customerName: order.customerName,
+        customerPhone: order.phone || "",
+        customerAddress: order.address,
+        items: order.items.map((item) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          observations: item.complements?.join(", ") || "",
+        })),
+        subtotal: order.items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+        deliveryFee: order.type === "delivery" ? 5.0 : 0,
+        total:
+          order.items.reduce((sum, item) => sum + item.price * item.quantity, 0) +
+          (order.type === "delivery" ? 5.0 : 0),
+        paymentMethod: order.paymentMethod,
+        type: order.type,
+        observations: order.observations,
+      }
+
+      await qzTrayService.printOrder(orderData)
+      toast.success(`Pedido #${order.number} enviado para impressão`)
+    } catch (error) {
+      console.error("[v0] Erro ao imprimir pedido:", error)
+      toast.error("Erro ao imprimir pedido: " + error.message)
+    }
   }
 
   const getStatusColor = (status: Order["status"]) => {
