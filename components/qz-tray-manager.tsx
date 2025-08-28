@@ -103,8 +103,26 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
     setLoading(true)
     try {
       console.log("[v0] Iniciando carregamento de impressoras...")
-      const printerList = await qzTrayService.listPrinters()
-      console.log("[v0] Lista de impressoras recebida:", printerList)
+      const result = await qzTrayService.listPrinters()
+      console.log("[v0] Lista de impressoras recebida:", result)
+
+      let printerList = []
+
+      if (Array.isArray(result)) {
+        // Direct array return (legacy format)
+        printerList = result
+      } else if (result && Array.isArray(result.printers)) {
+        // Object with printers array (new format)
+        printerList = result.printers
+      } else if (typeof result === "string") {
+        // String message return (fallback case)
+        console.warn("[v0] Received string instead of array:", result)
+        printerList = []
+      } else {
+        // Unexpected format
+        console.warn("[v0] Unexpected printer list format:", result)
+        printerList = []
+      }
 
       setPrinters(printerList)
 
