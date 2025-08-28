@@ -5,16 +5,22 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env
 
 async function getUserByEmail(email: string) {
   try {
-    const { data: user, error } = await supabase.from("users").select("id").eq("email", email).single()
+    const { data: user, error } = await supabase.from("users").select("id").eq("email", email).maybeSingle()
 
-    if (error || !user) {
-      console.log("[v0] Usuário não encontrado para email:", email)
+    if (error) {
+      console.error("[v0] WhatsApp Alerts: Erro ao buscar usuário:", error.message)
       return null
     }
 
+    if (!user) {
+      console.log("[v0] WhatsApp Alerts: Usuário não encontrado para email:", email)
+      return null
+    }
+
+    console.log("[v0] WhatsApp Alerts: Usuário encontrado:", user.id)
     return user.id
   } catch (error) {
-    console.error("[v0] Erro ao buscar usuário:", error)
+    console.error("[v0] WhatsApp Alerts: Erro crítico ao buscar usuário:", error)
     return null
   }
 }
@@ -43,17 +49,37 @@ async function checkTableStructure() {
 export async function GET(request: NextRequest) {
   try {
     const userEmail = request.headers.get("x-user-email") || "tarcisiorp16@gmail.com"
-    const userId = await getUserByEmail(userEmail)
+
+    let userId = await getUserByEmail(userEmail)
+
+    // Retry once if user lookup fails
+    if (!userId) {
+      console.log("[v0] WhatsApp Alerts: Tentando novamente buscar usuário...")
+      await new Promise((resolve) => setTimeout(resolve, 100)) // Small delay
+      userId = await getUserByEmail(userEmail)
+    }
 
     if (!userId) {
-      console.log("[v0] WhatsApp Alerts: Usuário não encontrado, retornando array vazio")
+      console.log("[v0] WhatsApp Alerts: Usuário não encontrado após retry, retornando array vazio")
       return NextResponse.json([])
     }
 
-    const tableInfo = await checkTableStructure()
+    const tableInfoPromise = checkTableStructure()
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000))
+
+    let tableInfo
+    try {
+      tableInfo = await Promise.race([tableInfoPromise, timeoutPromise])
+    } catch (error) {
+      console.log("[v0] WhatsApp Alerts: Timeout ou erro ao verificar tabela, usando fallback")
+      tableInfo = {
+        exists: true,
+        columns: ["id", "customer_name", "phone", "message", "order_id", "is_read", "created_at", "updated_at"],
+      }
+    }
 
     if (!tableInfo.exists) {
-      console.log("[v0] Tabela whatsapp_alerts não existe, retornando array vazio")
+      console.log("[v0] WhatsApp Alerts: Tabela whatsapp_alerts não existe, retornando array vazio")
       return NextResponse.json([])
     }
 
