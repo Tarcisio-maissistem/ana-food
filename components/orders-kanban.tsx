@@ -588,6 +588,7 @@ export function OrdersKanban() {
   }
 
   useEffect(() => {
+    loadOrders() // Load orders when component mounts
     validateQzTrayConnection()
     loadPrinterSettings()
     loadCompanyData()

@@ -3,7 +3,13 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { createClient } from "@supabase/supabase-js"
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+  realtime: {
+    params: {
+      eventsPerSecond: 2,
+    },
+  },
+})
 
 interface WhatsAppAlert {
   id: string
@@ -88,9 +94,8 @@ export function useRealtimeWhatsAppAlerts(userEmail = "tarcisiorp16@gmail.com"):
     const setupRealtimeSubscription = async () => {
       const currentUserId = userId || (await getUserId())
       if (!currentUserId) {
-        if (Date.now() - lastErrorTimeRef.current > 30000) {
-          // Only log every 30 seconds
-          console.log("[v0] Realtime WhatsApp: User ID não encontrado")
+        if (Date.now() - lastErrorTimeRef.current > 60000) {
+          console.error("[v0] Realtime WhatsApp: User ID não encontrado")
           lastErrorTimeRef.current = Date.now()
         }
         return
@@ -110,8 +115,8 @@ export function useRealtimeWhatsAppAlerts(userEmail = "tarcisiorp16@gmail.com"):
           config: {
             broadcast: { self: false },
             presence: { key: currentUserId },
-            timeout: 10000,
-            heartbeat: { interval: 30000 },
+            timeout: 30000,
+            heartbeat: { interval: 60000 },
           },
         })
         .on(
@@ -125,11 +130,9 @@ export function useRealtimeWhatsAppAlerts(userEmail = "tarcisiorp16@gmail.com"):
           (payload) => {
             const newAlert = payload.new as WhatsAppAlert
             if (!shownAlertsRef.current.has(newAlert.id)) {
-              console.log("[v0] Realtime WhatsApp: Novo alerta recebido:", newAlert.id)
               setAlerts((prev) => [newAlert, ...prev])
               shownAlertsRef.current.add(newAlert.id)
 
-              // Show browser notification only once per alert
               if (Notification.permission === "granted") {
                 new Notification("Nova mensagem WhatsApp", {
                   body: `${newAlert.customer_name}: ${newAlert.message.substring(0, 50)}...`,
@@ -168,15 +171,13 @@ export function useRealtimeWhatsAppAlerts(userEmail = "tarcisiorp16@gmail.com"):
         .subscribe((status) => {
           if (status === "SUBSCRIBED") {
             setIsConnected(true)
-            errorCountRef.current = 0 // Reset error count on successful connection
-            console.log("[v0] Realtime WhatsApp: Conectado com sucesso")
+            errorCountRef.current = 0
           } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
             setIsConnected(false)
             errorCountRef.current++
 
-            // Only log errors occasionally to prevent spam
-            if (errorCountRef.current === 1 || errorCountRef.current % 10 === 0) {
-              console.log(`[v0] Realtime WhatsApp: Erro de conexão (${errorCountRef.current}x) - mantendo dados atuais`)
+            if (errorCountRef.current === 1 || errorCountRef.current % 20 === 0) {
+              console.error(`[v0] Realtime WhatsApp: Erro de conexão (${errorCountRef.current}x)`)
             }
           } else {
             setIsConnected(status === "SUBSCRIBED")
@@ -192,7 +193,6 @@ export function useRealtimeWhatsAppAlerts(userEmail = "tarcisiorp16@gmail.com"):
       setupRealtimeSubscription()
     }
 
-    // Request notification permission only once
     if (Notification.permission === "default") {
       Notification.requestPermission()
     }
@@ -219,7 +219,6 @@ export function useRealtimeWhatsAppAlerts(userEmail = "tarcisiorp16@gmail.com"):
         })
 
         if (response.ok) {
-          // Update local state immediately for better UX
           setAlerts((prev) => prev.map((alert) => (alert.id === alertId ? { ...alert, is_read: true } : alert)))
         }
       } catch (error) {
@@ -242,7 +241,6 @@ export function useRealtimeWhatsAppAlerts(userEmail = "tarcisiorp16@gmail.com"):
         })
 
         if (response.ok) {
-          // Update local state immediately for better UX
           setAlerts((prev) => prev.filter((alert) => alert.id !== alertId))
         }
       } catch (error) {
@@ -259,7 +257,7 @@ export function useRealtimeWhatsAppAlerts(userEmail = "tarcisiorp16@gmail.com"):
   const unreadCount = alerts.filter((alert) => !alert.is_read).length
 
   return {
-    alerts: alerts.filter((alert) => !alert.is_read), // Only show unread alerts
+    alerts: alerts.filter((alert) => !alert.is_read),
     unreadCount,
     isConnected,
     markAsRead,
