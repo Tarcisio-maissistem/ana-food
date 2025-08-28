@@ -15,7 +15,6 @@ import {
   Search,
   Edit,
   Trash2,
-  Printer,
   Package,
   Tag,
   ChevronsLeft,
@@ -694,7 +693,7 @@ export function ProductsScreen() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="products" className="flex items-center gap-2">
             <Package className="w-4 h-4" />
             Produtos
@@ -706,10 +705,6 @@ export function ProductsScreen() {
           <TabsTrigger value="additionals" className="flex items-center gap-2">
             <Plus className="w-4 h-4" />
             Adicionais
-          </TabsTrigger>
-          <TabsTrigger value="print-locations" className="flex items-center gap-2">
-            <Printer className="w-4 h-4" />
-            Locais de Impressão
           </TabsTrigger>
         </TabsList>
 
@@ -937,24 +932,6 @@ export function ProductsScreen() {
             searchTerm={additionalsSearch}
             setSearchTerm={setAdditionalsSearch}
             isAdditionalSaving={isAdditionalSaving}
-          />
-        </TabsContent>
-
-        <TabsContent value="print-locations" className="space-y-4">
-          <PrintLocationsTab
-            printLocations={printLocationsList}
-            onReload={loadPrintLocations}
-            isDialogOpen={isPrintLocationDialogOpen}
-            setIsDialogOpen={setIsPrintLocationDialogOpen}
-            selectedPrintLocation={selectedPrintLocation}
-            setSelectedPrintLocation={setSelectedPrintLocation}
-            onSave={handleSavePrintLocation}
-            pagination={printLocationsPagination}
-            currentPage={printLocationsPage}
-            setCurrentPage={setPrintLocationsPage}
-            searchTerm={printLocationsSearch}
-            setSearchTerm={setPrintLocationsSearch}
-            isPrintLocationSaving={isPrintLocationSaving}
           />
         </TabsContent>
       </Tabs>

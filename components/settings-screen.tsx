@@ -9,7 +9,14 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Building2,
@@ -24,6 +31,9 @@ import {
   AlertCircle,
   AlertTriangle,
   Printer,
+  Plus,
+  Edit,
+  Trash2,
 } from "lucide-react"
 import { toast } from "react-hot-toast"
 import { useUser } from "./main-dashboard"
@@ -89,6 +99,12 @@ interface PrinterSector {
   printer_name?: string | null
   active: boolean
   user_id?: string
+}
+
+interface PrintLocation {
+  id: string
+  name: string
+  printer_name: string
 }
 
 const EVOLUTION_API_BASE_URL = "https://evo.anafood.vip"
@@ -173,6 +189,11 @@ const SettingsScreen = () => {
   const [selectedSector, setSelectedSector] = useState<PrinterSector | null>(null)
   const [isSectorDialogOpen, setIsSectorDialogOpen] = useState(false)
   const [availablePrinters, setAvailablePrinters] = useState<{ name: string; status: string }[]>([])
+
+  const [printLocationsList, setPrintLocationsList] = useState<PrintLocation[]>([])
+  const [selectedPrintLocation, setSelectedPrintLocation] = useState<PrintLocation | null>(null)
+  const [isPrintLocationDialogOpen, setIsPrintLocationDialogOpen] = useState(false)
+  const [isPrintLocationSaving, setIsPrintLocationSaving] = useState(false)
 
   const loadEmpresaData = async () => {
     try {
@@ -775,11 +796,87 @@ const SettingsScreen = () => {
     toast.success("Configuração do setor atualizada!")
   }
 
+  const loadPrintLocations = async () => {
+    try {
+      const response = await fetch("/api/print-locations", {
+        headers: {
+          "x-user-email": user?.email || "tarcisiorp16@gmail.com",
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setPrintLocationsList(Array.isArray(data) ? data : [])
+      } else {
+        console.error("Erro ao carregar setores de impressão:", response.status)
+        setPrintLocationsList([])
+      }
+    } catch (error) {
+      console.error("Erro ao carregar setores:", error)
+      setPrintLocationsList([])
+    }
+  }
+
+  const handleSavePrintLocation = async (printLocationData: Partial<PrintLocation>) => {
+    setIsPrintLocationSaving(true)
+    try {
+      const method = selectedPrintLocation ? "PUT" : "POST"
+      const response = await fetch("/api/print-locations", {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-email": user?.email || "tarcisiorp16@gmail.com",
+        },
+        body: JSON.stringify(
+          selectedPrintLocation ? { id: selectedPrintLocation.id, ...printLocationData } : printLocationData,
+        ),
+      })
+
+      if (response.ok) {
+        toast.success(selectedPrintLocation ? "Setor atualizado!" : "Setor adicionado!")
+        setIsPrintLocationDialogOpen(false)
+        setSelectedPrintLocation(null)
+        loadPrintLocations()
+      } else {
+        throw new Error("Erro na resposta da API")
+      }
+    } catch (error) {
+      console.error("Erro ao salvar setor:", error)
+      toast.error("Erro ao salvar setor")
+    } finally {
+      setIsPrintLocationSaving(false)
+    }
+  }
+
+  const handleDeletePrintLocation = async (printLocationId: string) => {
+    if (!confirm("Tem certeza que deseja excluir este setor de impressão?")) return
+
+    try {
+      const response = await fetch(`/api/print-locations?id=${printLocationId}`, {
+        method: "DELETE",
+        headers: {
+          "x-user-email": user?.email || "tarcisiorp16@gmail.com",
+        },
+      })
+
+      if (response.ok) {
+        toast.success("Setor removido!")
+        loadPrintLocations()
+      } else {
+        throw new Error("Erro na resposta da API")
+      }
+    } catch (error) {
+      console.error("Erro ao excluir setor:", error)
+      toast.error("Erro ao excluir setor")
+    }
+  }
+
   useEffect(() => {
     loadEmpresaData()
     loadPrinters()
     loadPrinterSectors()
     checkQzTrayConnection()
+    loadPrintLocations()
   }, [])
 
   return (
@@ -937,6 +1034,96 @@ const SettingsScreen = () => {
           <div className="space-y-6">
             <EstabelecimentoScreen />
           </div>
+        </TabsContent>
+
+        <TabsContent value="impressoras" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">Configuração de Impressoras</h2>
+              <p className="text-sm text-muted-foreground">Configure as impressoras por setor de impressão</p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={syncWithQzTray}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 bg-transparent"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Sincronizar QZ Tray
+              </Button>
+              <Dialog open={isPrintLocationDialogOpen} onOpenChange={setIsPrintLocationDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" onClick={() => setSelectedPrintLocation(null)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Novo Setor
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{selectedPrintLocation ? "Editar Setor" : "Novo Setor de Impressão"}</DialogTitle>
+                  </DialogHeader>
+                  <PrintLocationDialog
+                    printLocation={selectedPrintLocation}
+                    onSave={handleSavePrintLocation}
+                    onClose={() => setIsPrintLocationDialogOpen(false)}
+                    isLoading={isPrintLocationSaving}
+                    availablePrinters={availablePrinters}
+                  />
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+
+          {/* QZ Tray Status */}
+          <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+            <div className={`w-2 h-2 rounded-full ${qzTrayConnected ? "bg-green-500" : "bg-red-500"}`} />
+            <span className="text-sm">QZ Tray: {qzTrayConnected ? "Conectado" : "Desconectado"}</span>
+            {availablePrinters.length > 0 && (
+              <span className="text-sm text-muted-foreground ml-2">
+                ({availablePrinters.length} impressoras disponíveis)
+              </span>
+            )}
+          </div>
+
+          {/* Print Locations List */}
+          <div className="grid gap-4">
+            {printLocationsList.map((location) => (
+              <div key={location.id} className="border rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium">{location.name}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Impressora: {location.printer_name || "Não configurada"}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedPrintLocation(location)
+                        setIsPrintLocationDialogOpen(true)
+                      }}
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleDeletePrintLocation(location.id)}>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {printLocationsList.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              <Printer className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>Nenhum setor de impressão configurado</p>
+              <p className="text-sm">Clique em "Novo Setor" para começar</p>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="whatsapp">
@@ -1360,6 +1547,85 @@ function PrinterDialog({
         </Button>
         <Button type="submit" className="flex-1">
           Salvar
+        </Button>
+      </div>
+    </form>
+  )
+}
+
+function PrintLocationDialog({
+  printLocation,
+  onSave,
+  onClose,
+  isLoading,
+  availablePrinters,
+}: {
+  printLocation: PrintLocation | null
+  onSave: (data: Partial<PrintLocation>) => void
+  onClose: () => void
+  isLoading: boolean
+  availablePrinters: { name: string; status: string }[]
+}) {
+  const [formData, setFormData] = useState({
+    name: printLocation?.name || "",
+    printer_name: printLocation?.printer_name || "",
+  })
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.name.trim()) return
+    const dataToSave = {
+      ...formData,
+      printer_name: formData.printer_name === "none" ? "" : formData.printer_name,
+    }
+    onSave(dataToSave)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <Label htmlFor="location-name">Nome do Setor</Label>
+        <Input
+          id="location-name"
+          value={formData.name}
+          onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+          placeholder="Ex: Cozinha, Caixa, Bar"
+          required
+        />
+      </div>
+
+      <div>
+        <Label htmlFor="printer-select">Impressora</Label>
+        <Select
+          value={formData.printer_name || "none"}
+          onValueChange={(value) => setFormData((prev) => ({ ...prev, printer_name: value }))}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Selecione uma impressora" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Nenhuma impressora</SelectItem>
+            {availablePrinters.map((printer) => (
+              <SelectItem key={printer.name} value={printer.name}>
+                {printer.name} ({printer.status})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex gap-2 pt-4">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onClose}
+          className="flex-1 bg-transparent"
+          disabled={isLoading}
+        >
+          Cancelar
+        </Button>
+        <Button type="submit" className="flex-1" disabled={isLoading}>
+          {isLoading ? "Salvando..." : "Salvar"}
         </Button>
       </div>
     </form>
