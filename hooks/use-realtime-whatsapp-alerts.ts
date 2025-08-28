@@ -33,6 +33,8 @@ export function useRealtimeWhatsAppAlerts(userEmail = "tarcisiorp16@gmail.com"):
   const isLoadingRef = useRef(false)
   const shownAlertsRef = useRef(new Set<string>())
   const channelRef = useRef<any>(null)
+  const errorCountRef = useRef(0)
+  const lastErrorTimeRef = useRef(0)
 
   const getUserId = useCallback(async () => {
     if (isLoadingRef.current) return userId
@@ -86,23 +88,30 @@ export function useRealtimeWhatsAppAlerts(userEmail = "tarcisiorp16@gmail.com"):
     const setupRealtimeSubscription = async () => {
       const currentUserId = userId || (await getUserId())
       if (!currentUserId) {
-        console.log("[v0] Realtime WhatsApp: User ID não encontrado")
+        if (Date.now() - lastErrorTimeRef.current > 30000) {
+          // Only log every 30 seconds
+          console.log("[v0] Realtime WhatsApp: User ID não encontrado")
+          lastErrorTimeRef.current = Date.now()
+        }
         return
       }
 
       if (channelRef.current) {
-        console.log("[v0] Realtime WhatsApp: Removendo subscription anterior")
         supabase.removeChannel(channelRef.current)
         channelRef.current = null
       }
 
-      console.log("[v0] Realtime WhatsApp: Configurando subscription para user:", currentUserId)
+      if (errorCountRef.current === 0) {
+        console.log("[v0] Realtime WhatsApp: Configurando subscription para user:", currentUserId)
+      }
 
       channelRef.current = supabase
         .channel(`whatsapp-alerts-${currentUserId}`, {
           config: {
             broadcast: { self: false },
             presence: { key: currentUserId },
+            timeout: 10000,
+            heartbeat: { interval: 30000 },
           },
         })
         .on(
@@ -140,7 +149,6 @@ export function useRealtimeWhatsAppAlerts(userEmail = "tarcisiorp16@gmail.com"):
           },
           (payload) => {
             const updatedAlert = payload.new as WhatsAppAlert
-            console.log("[v0] Realtime WhatsApp: Alerta atualizado:", updatedAlert.id)
             setAlerts((prev) => prev.map((alert) => (alert.id === updatedAlert.id ? updatedAlert : alert)))
           },
         )
@@ -153,17 +161,25 @@ export function useRealtimeWhatsAppAlerts(userEmail = "tarcisiorp16@gmail.com"):
             filter: `user_id=eq.${currentUserId}`,
           },
           (payload) => {
-            console.log("[v0] Realtime WhatsApp: Alerta removido:", payload.old.id)
             setAlerts((prev) => prev.filter((alert) => alert.id !== payload.old.id))
             shownAlertsRef.current.delete(payload.old.id)
           },
         )
         .subscribe((status) => {
-          console.log("[v0] Realtime WhatsApp: Status da subscription:", status)
-          setIsConnected(status === "SUBSCRIBED")
+          if (status === "SUBSCRIBED") {
+            setIsConnected(true)
+            errorCountRef.current = 0 // Reset error count on successful connection
+            console.log("[v0] Realtime WhatsApp: Conectado com sucesso")
+          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            setIsConnected(false)
+            errorCountRef.current++
 
-          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-            console.log("[v0] Realtime WhatsApp: Subscription falhou, mantendo dados atuais")
+            // Only log errors occasionally to prevent spam
+            if (errorCountRef.current === 1 || errorCountRef.current % 10 === 0) {
+              console.log(`[v0] Realtime WhatsApp: Erro de conexão (${errorCountRef.current}x) - mantendo dados atuais`)
+            }
+          } else {
+            setIsConnected(status === "SUBSCRIBED")
           }
         })
     }
@@ -183,7 +199,6 @@ export function useRealtimeWhatsAppAlerts(userEmail = "tarcisiorp16@gmail.com"):
 
     return () => {
       if (channelRef.current) {
-        console.log("[v0] Realtime WhatsApp: Removendo subscription")
         supabase.removeChannel(channelRef.current)
         channelRef.current = null
       }
