@@ -48,18 +48,8 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
 
   // Load QZ Tray script and check connection on mount
   useEffect(() => {
-    const script = document.createElement("script")
-    script.src = "https://cdn.jsdelivr.net/npm/qz-tray@2.2.3/qz-tray.js"
-    script.async = true
-    script.onload = () => {
-      console.log("[v0] QZ Tray script carregado")
-      checkConnection()
-    }
-    document.head.appendChild(script)
-
-    return () => {
-      document.head.removeChild(script)
-    }
+    // Auto-check connection on mount (no script loading needed)
+    checkConnection()
   }, [])
 
   useEffect(() => {
@@ -76,12 +66,6 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
   const checkConnection = async () => {
     try {
       console.log("[v0] Verificando conexão QZ Tray...")
-
-      if (!window.qz) {
-        console.error("[v0] QZ Tray script não está carregado")
-        setIsConnected(false)
-        return
-      }
 
       const connected = await qzTrayService.connect()
       console.log("[v0] Resultado da conexão:", connected)
