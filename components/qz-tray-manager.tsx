@@ -7,7 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Printer, TestTube, RefreshCw, Wifi, WifiOff } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Printer, TestTube, RefreshCw, Wifi, WifiOff, Eye, Edit3 } from "lucide-react"
 import qzTrayService from "@/lib/qz-tray-service"
 
 interface QZTrayManagerProps {
@@ -26,7 +28,25 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
     showPhone: true,
   })
 
-  // Load QZ Tray script
+  const [sampleOrder, setSampleOrder] = useState({
+    id: "PED-001",
+    customerName: "João Silva",
+    customerPhone: "(11) 99999-9999",
+    customerAddress: "Rua das Flores, 123 - Centro",
+    items: [
+      { name: "X-Burger", quantity: 2, price: 15.9, observations: "Sem cebola" },
+      { name: "Batata Frita", quantity: 1, price: 8.5, observations: "" },
+      { name: "Coca-Cola 350ml", quantity: 2, price: 4.5, observations: "" },
+    ],
+    subtotal: 48.8,
+    deliveryFee: 5.0,
+    total: 53.8,
+    paymentMethod: "Dinheiro",
+    change: 60.0,
+    observations: "Entregar no portão azul",
+  })
+
+  // Load QZ Tray script and check connection on mount
   useEffect(() => {
     const script = document.createElement("script")
     script.src = "https://cdn.jsdelivr.net/npm/qz-tray@2.2.3/qz-tray.js"
@@ -40,6 +60,17 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
     return () => {
       document.head.removeChild(script)
     }
+  }, [])
+
+  useEffect(() => {
+    const autoCheckConnection = async () => {
+      if (window.qz) {
+        await checkConnection()
+      }
+    }
+
+    const timer = setTimeout(autoCheckConnection, 1000)
+    return () => clearTimeout(timer)
   }, [])
 
   const checkConnection = async () => {
@@ -61,6 +92,11 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
       const printerList = await qzTrayService.listPrinters()
       setPrinters(printerList)
       console.log("[v0] Impressoras carregadas:", printerList)
+
+      if (printerList.length > 0 && !selectedPrinter) {
+        setSelectedPrinter(printerList[0])
+        qzTrayService.setSelectedPrinter(printerList[0])
+      }
     } catch (error) {
       console.error("[v0] Erro ao carregar impressoras:", error)
     } finally {
@@ -71,6 +107,7 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
   const handlePrinterSelect = (printerName: string) => {
     setSelectedPrinter(printerName)
     qzTrayService.setSelectedPrinter(printerName)
+    console.log("[v0] Impressora selecionada:", printerName)
   }
 
   const handleSettingChange = (setting: string, value: boolean) => {
@@ -87,7 +124,7 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
 
     setLoading(true)
     try {
-      await qzTrayService.testPrint(companyData)
+      await qzTrayService.printOrder(sampleOrder, companyData)
       alert("Teste de impressão enviado com sucesso!")
     } catch (error) {
       console.error("[v0] Erro no teste de impressão:", error)
@@ -95,6 +132,57 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
     } finally {
       setLoading(false)
     }
+  }
+
+  const generatePreview = () => {
+    let preview = ""
+
+    if (printSettings.showLogo) {
+      preview += "🍔 LOGO DA EMPRESA\n"
+    }
+
+    if (printSettings.showTitle) {
+      preview += `${companyData?.nome || "RESTAURANTE EXEMPLO"}\n`
+    }
+
+    if (printSettings.showAddress) {
+      preview += `${companyData?.rua || "Rua Exemplo, 123"}\n`
+    }
+
+    if (printSettings.showPhone) {
+      preview += `Tel: ${companyData?.telefone || "(11) 99999-9999"}\n`
+    }
+
+    preview += "\n" + "=".repeat(32) + "\n"
+    preview += `PEDIDO: ${sampleOrder.id}\n`
+    preview += `CLIENTE: ${sampleOrder.customerName}\n`
+    preview += `TELEFONE: ${sampleOrder.customerPhone}\n`
+    preview += `ENDEREÇO: ${sampleOrder.customerAddress}\n`
+    preview += "=".repeat(32) + "\n\n"
+
+    sampleOrder.items.forEach((item) => {
+      preview += `${item.quantity}x ${item.name}\n`
+      preview += `   R$ ${item.price.toFixed(2)}\n`
+      if (item.observations) {
+        preview += `   OBS: ${item.observations}\n`
+      }
+      preview += "\n"
+    })
+
+    preview += "-".repeat(32) + "\n"
+    preview += `SUBTOTAL: R$ ${sampleOrder.subtotal.toFixed(2)}\n`
+    preview += `ENTREGA: R$ ${sampleOrder.deliveryFee.toFixed(2)}\n`
+    preview += `TOTAL: R$ ${sampleOrder.total.toFixed(2)}\n`
+    preview += "-".repeat(32) + "\n"
+    preview += `PAGAMENTO: ${sampleOrder.paymentMethod}\n`
+    if (sampleOrder.change) {
+      preview += `TROCO PARA: R$ ${sampleOrder.change.toFixed(2)}\n`
+    }
+    if (sampleOrder.observations) {
+      preview += `\nOBSERVAÇÕES: ${sampleOrder.observations}\n`
+    }
+
+    return preview
   }
 
   return (
@@ -130,7 +218,9 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
             <Printer className="h-5 w-5" />
             Seleção de Impressora
           </CardTitle>
-          <CardDescription>Escolha a impressora para imprimir os pedidos</CardDescription>
+          <CardDescription>
+            Escolha a impressora para imprimir os pedidos ({printers.length} encontradas)
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-4">
@@ -209,6 +299,92 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Eye className="h-5 w-5" />
+            Pré-visualização do Pedido
+          </CardTitle>
+          <CardDescription>Visualize como o pedido será impresso e edite os dados de exemplo</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Sample Order Editor */}
+            <div className="space-y-4">
+              <h4 className="font-medium flex items-center gap-2">
+                <Edit3 className="h-4 w-4" />
+                Dados do Pedido de Exemplo
+              </h4>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="order-id">Número do Pedido</Label>
+                  <Input
+                    id="order-id"
+                    value={sampleOrder.id}
+                    onChange={(e) => setSampleOrder({ ...sampleOrder, id: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="customer-name">Nome do Cliente</Label>
+                  <Input
+                    id="customer-name"
+                    value={sampleOrder.customerName}
+                    onChange={(e) => setSampleOrder({ ...sampleOrder, customerName: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="customer-phone">Telefone</Label>
+                  <Input
+                    id="customer-phone"
+                    value={sampleOrder.customerPhone}
+                    onChange={(e) => setSampleOrder({ ...sampleOrder, customerPhone: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="payment-method">Forma de Pagamento</Label>
+                  <Input
+                    id="payment-method"
+                    value={sampleOrder.paymentMethod}
+                    onChange={(e) => setSampleOrder({ ...sampleOrder, paymentMethod: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="customer-address">Endereço de Entrega</Label>
+                <Input
+                  id="customer-address"
+                  value={sampleOrder.customerAddress}
+                  onChange={(e) => setSampleOrder({ ...sampleOrder, customerAddress: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="observations">Observações</Label>
+                <Textarea
+                  id="observations"
+                  value={sampleOrder.observations}
+                  onChange={(e) => setSampleOrder({ ...sampleOrder, observations: e.target.value })}
+                  rows={2}
+                />
+              </div>
+            </div>
+
+            {/* Print Preview */}
+            <div className="space-y-4">
+              <h4 className="font-medium">Pré-visualização da Impressão</h4>
+              <div className="bg-gray-50 p-4 rounded-lg border">
+                <pre className="text-xs font-mono whitespace-pre-wrap leading-tight">{generatePreview()}</pre>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Test Print */}
       <Card>
         <CardHeader>
@@ -216,13 +392,18 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
             <TestTube className="h-5 w-5" />
             Teste de Impressão
           </CardTitle>
-          <CardDescription>Envie um pedido de teste para verificar a impressão</CardDescription>
+          <CardDescription>Envie o pedido de exemplo para a impressora selecionada</CardDescription>
         </CardHeader>
         <CardContent>
           <Button onClick={handleTestPrint} disabled={loading || !isConnected || !selectedPrinter} className="w-full">
             {loading ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <TestTube className="h-4 w-4 mr-2" />}
             Imprimir Teste
           </Button>
+
+          {!isConnected && <p className="text-sm text-red-600 mt-2">QZ Tray não está conectado</p>}
+          {!selectedPrinter && isConnected && (
+            <p className="text-sm text-orange-600 mt-2">Selecione uma impressora primeiro</p>
+          )}
         </CardContent>
       </Card>
     </div>
