@@ -86,13 +86,19 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
       const connected = await qzTrayService.connect()
       console.log("[v0] Resultado da conexão:", connected)
 
-      if (connected && connected.success) {
+      if (connected === true) {
+        // Successful connection returns true
         setIsConnected(true)
         console.log("[v0] Conexão estabelecida, carregando impressoras...")
         await loadPrinters()
-      } else {
+      } else if (connected && connected.success === false) {
+        // Failed connection returns object with success: false
         setIsConnected(false)
         console.error("[v0] Falha ao conectar com QZ Tray:", connected.error || "Conexão falhou")
+      } else {
+        // Unexpected return format
+        setIsConnected(false)
+        console.error("[v0] Formato de resposta inesperado:", connected)
       }
     } catch (error) {
       console.error("[v0] Erro ao verificar conexão QZ Tray:", error)
