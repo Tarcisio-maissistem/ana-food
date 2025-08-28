@@ -85,13 +85,14 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
 
       const connected = await qzTrayService.connect()
       console.log("[v0] Resultado da conexão:", connected)
-      setIsConnected(connected)
 
-      if (connected) {
+      if (connected && connected.success) {
+        setIsConnected(true)
         console.log("[v0] Conexão estabelecida, carregando impressoras...")
         await loadPrinters()
       } else {
-        console.error("[v0] Falha ao conectar com QZ Tray")
+        setIsConnected(false)
+        console.error("[v0] Falha ao conectar com QZ Tray:", connected.error || "Conexão falhou")
       }
     } catch (error) {
       console.error("[v0] Erro ao verificar conexão QZ Tray:", error)
@@ -235,19 +236,39 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
             Status da Conexão QZ Tray
           </CardTitle>
           <CardDescription>
-            {isConnected ? "Conectado e pronto para imprimir" : "Desconectado - Verifique se o QZ Tray está ativo"}
+            {isConnected
+              ? "Conectado e pronto para imprimir"
+              : "QZ Tray não está rodando. Instale e execute o QZ Tray para detectar impressoras do Windows."}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-4">
             <Badge variant={isConnected ? "default" : "destructive"}>
-              {isConnected ? "Conectado" : "Desconectado"}
+              {isConnected ? "Conectado" : "QZ Tray Não Disponível"}
             </Badge>
             <Button onClick={checkConnection} disabled={loading} variant="outline" size="sm">
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-              Reconectar
+              {isConnected ? "Reconectar" : "Tentar Conectar"}
             </Button>
           </div>
+
+          {!isConnected && (
+            <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+              <h4 className="font-medium text-orange-800 mb-2">Como instalar o QZ Tray:</h4>
+              <ol className="text-sm text-orange-700 space-y-1">
+                <li>
+                  1. Baixe o QZ Tray em:{" "}
+                  <a href="https://qz.io/download/" target="_blank" rel="noopener noreferrer" className="underline">
+                    https://qz.io/download/
+                  </a>
+                </li>
+                <li>2. Instale o aplicativo no seu computador</li>
+                <li>3. Execute o QZ Tray (deve aparecer na bandeja do sistema)</li>
+                <li>4. Certifique-se de que está rodando na porta 8182</li>
+                <li>5. Recarregue esta página para tentar conectar novamente</li>
+              </ol>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -440,7 +461,11 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
             Imprimir Teste
           </Button>
 
-          {!isConnected && <p className="text-sm text-red-600 mt-2">QZ Tray não está conectado</p>}
+          {!isConnected && (
+            <p className="text-sm text-red-600 mt-2">
+              QZ Tray não está rodando. Instale o QZ Tray para detectar impressoras do Windows.
+            </p>
+          )}
           {!selectedPrinter && isConnected && (
             <p className="text-sm text-orange-600 mt-2">Selecione uma impressora primeiro</p>
           )}
