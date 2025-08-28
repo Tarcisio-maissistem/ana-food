@@ -70,8 +70,8 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
       const connected = await qzTrayService.connect()
       console.log("[v0] Resultado da conexão:", connected)
 
-      if (connected === true) {
-        // Successful connection returns true
+      if (connected === true || (connected && connected.success === true)) {
+        // Successful connection returns true or {success: true}
         setIsConnected(true)
         console.log("[v0] Conexão estabelecida, carregando impressoras...")
         await loadPrinters()
