@@ -510,16 +510,22 @@ export function OrdersKanban() {
 
   const validateQzTrayConnection = async () => {
     try {
+      setQzTrayStatus("Conectando...")
       const connected = await qzTrayService.connect()
+
       if (connected === true || (connected && connected.success === true)) {
         setQzTrayConnected(true)
         setQzTrayStatus("Conectado")
       } else {
         setQzTrayConnected(false)
-        setQzTrayStatus("Desconectado")
+        if (connected && connected.error) {
+          setQzTrayStatus(connected.error.includes("não está rodando") ? "QZ Tray não iniciado" : "Erro de conexão")
+        } else {
+          setQzTrayStatus("Desconectado")
+        }
       }
     } catch (error) {
-      console.error("Erro ao validar conexão QZ Tray:", error)
+      console.error("[v0] Erro ao validar conexão QZ Tray:", error)
       setQzTrayConnected(false)
       setQzTrayStatus("Erro de conexão")
     }
