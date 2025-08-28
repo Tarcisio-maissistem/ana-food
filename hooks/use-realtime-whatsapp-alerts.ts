@@ -41,6 +41,9 @@ export function useRealtimeWhatsAppAlerts(userEmail = "tarcisiorp16@gmail.com"):
   const channelRef = useRef<any>(null)
   const errorCountRef = useRef(0)
   const lastErrorTimeRef = useRef(0)
+  const maxRetries = 5
+  const isCircuitBreakerOpen = useRef(false)
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const getUserId = useCallback(async () => {
     if (isLoadingRef.current) return userId
@@ -90,6 +93,22 @@ export function useRealtimeWhatsAppAlerts(userEmail = "tarcisiorp16@gmail.com"):
     }
   }, [userEmail])
 
+  const startPollingFallback = useCallback(async () => {
+    if (pollingIntervalRef.current) return
+
+    console.log("[v0] Realtime WhatsApp: Iniciando polling fallback")
+    pollingIntervalRef.current = setInterval(async () => {
+      await loadInitialAlerts()
+    }, 30000) // Poll every 30 seconds
+  }, [loadInitialAlerts])
+
+  const stopPollingFallback = useCallback(() => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current)
+      pollingIntervalRef.current = null
+    }
+  }, [])
+
   useEffect(() => {
     const setupRealtimeSubscription = async () => {
       const currentUserId = userId || (await getUserId())
@@ -97,6 +116,13 @@ export function useRealtimeWhatsAppAlerts(userEmail = "tarcisiorp16@gmail.com"):
         if (Date.now() - lastErrorTimeRef.current > 60000) {
           console.error("[v0] Realtime WhatsApp: User ID não encontrado")
           lastErrorTimeRef.current = Date.now()
+        }
+        return
+      }
+
+      if (isCircuitBreakerOpen.current) {
+        if (!pollingIntervalRef.current) {
+          startPollingFallback()
         }
         return
       }
@@ -110,79 +136,110 @@ export function useRealtimeWhatsAppAlerts(userEmail = "tarcisiorp16@gmail.com"):
         console.log("[v0] Realtime WhatsApp: Configurando subscription para user:", currentUserId)
       }
 
-      channelRef.current = supabase
-        .channel(`whatsapp-alerts-${currentUserId}`, {
-          config: {
-            broadcast: { self: false },
-            presence: { key: currentUserId },
-            timeout: 30000,
-            heartbeat: { interval: 60000 },
-          },
-        })
-        .on(
-          "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "public",
-            table: "whatsapp_alerts",
-            filter: `user_id=eq.${currentUserId}`,
-          },
-          (payload) => {
-            const newAlert = payload.new as WhatsAppAlert
-            if (!shownAlertsRef.current.has(newAlert.id)) {
-              setAlerts((prev) => [newAlert, ...prev])
-              shownAlertsRef.current.add(newAlert.id)
+      try {
+        channelRef.current = supabase
+          .channel(`whatsapp-alerts-${currentUserId}`, {
+            config: {
+              broadcast: { self: false },
+              presence: { key: currentUserId },
+              timeout: 15000, // Reduced timeout
+              heartbeat: { interval: 30000 }, // Reduced heartbeat interval
+            },
+          })
+          .on(
+            "postgres_changes",
+            {
+              event: "INSERT",
+              schema: "public",
+              table: "whatsapp_alerts",
+              filter: `user_id=eq.${currentUserId}`,
+            },
+            (payload) => {
+              try {
+                const newAlert = payload.new as WhatsAppAlert
+                if (!shownAlertsRef.current.has(newAlert.id)) {
+                  setAlerts((prev) => [newAlert, ...prev])
+                  shownAlertsRef.current.add(newAlert.id)
 
-              if (Notification.permission === "granted") {
-                new Notification("Nova mensagem WhatsApp", {
-                  body: `${newAlert.customer_name}: ${newAlert.message.substring(0, 50)}...`,
-                  icon: "/whatsapp-icon.png",
-                })
+                  if (Notification.permission === "granted") {
+                    new Notification("Nova mensagem WhatsApp", {
+                      body: `${newAlert.customer_name}: ${newAlert.message.substring(0, 50)}...`,
+                      icon: "/whatsapp-icon.png",
+                    })
+                  }
+                }
+              } catch (error) {
+                console.error("[v0] Realtime WhatsApp: Erro ao processar novo alerta:", error)
               }
-            }
-          },
-        )
-        .on(
-          "postgres_changes",
-          {
-            event: "UPDATE",
-            schema: "public",
-            table: "whatsapp_alerts",
-            filter: `user_id=eq.${currentUserId}`,
-          },
-          (payload) => {
-            const updatedAlert = payload.new as WhatsAppAlert
-            setAlerts((prev) => prev.map((alert) => (alert.id === updatedAlert.id ? updatedAlert : alert)))
-          },
-        )
-        .on(
-          "postgres_changes",
-          {
-            event: "DELETE",
-            schema: "public",
-            table: "whatsapp_alerts",
-            filter: `user_id=eq.${currentUserId}`,
-          },
-          (payload) => {
-            setAlerts((prev) => prev.filter((alert) => alert.id !== payload.old.id))
-            shownAlertsRef.current.delete(payload.old.id)
-          },
-        )
-        .subscribe((status) => {
-          if (status === "SUBSCRIBED") {
-            setIsConnected(true)
-            errorCountRef.current = 0
-          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-            setIsConnected(false)
-            errorCountRef.current++
+            },
+          )
+          .on(
+            "postgres_changes",
+            {
+              event: "UPDATE",
+              schema: "public",
+              table: "whatsapp_alerts",
+              filter: `user_id=eq.${currentUserId}`,
+            },
+            (payload) => {
+              try {
+                const updatedAlert = payload.new as WhatsAppAlert
+                setAlerts((prev) => prev.map((alert) => (alert.id === updatedAlert.id ? updatedAlert : alert)))
+              } catch (error) {
+                console.error("[v0] Realtime WhatsApp: Erro ao processar atualização:", error)
+              }
+            },
+          )
+          .on(
+            "postgres_changes",
+            {
+              event: "DELETE",
+              schema: "public",
+              table: "whatsapp_alerts",
+              filter: `user_id=eq.${currentUserId}`,
+            },
+            (payload) => {
+              try {
+                setAlerts((prev) => prev.filter((alert) => alert.id !== payload.old.id))
+                shownAlertsRef.current.delete(payload.old.id)
+              } catch (error) {
+                console.error("[v0] Realtime WhatsApp: Erro ao processar remoção:", error)
+              }
+            },
+          )
+          .subscribe((status) => {
+            try {
+              if (status === "SUBSCRIBED") {
+                setIsConnected(true)
+                errorCountRef.current = 0
+                isCircuitBreakerOpen.current = false
+                stopPollingFallback()
+              } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+                setIsConnected(false)
+                errorCountRef.current++
 
-            if (errorCountRef.current === 1 || errorCountRef.current % 20 === 0) {
-              console.error(`[v0] Realtime WhatsApp: Erro de conexão (${errorCountRef.current}x)`)
+                if (errorCountRef.current >= maxRetries) {
+                  isCircuitBreakerOpen.current = true
+                  console.error("[v0] Realtime WhatsApp: Muitos erros, ativando fallback polling")
+                  startPollingFallback()
+                } else if (errorCountRef.current === 1 || errorCountRef.current % 5 === 0) {
+                  console.error(`[v0] Realtime WhatsApp: Erro de conexão (${errorCountRef.current}x)`)
+                }
+              } else {
+                setIsConnected(status === "SUBSCRIBED")
+              }
+            } catch (error) {
+              console.error("[v0] Realtime WhatsApp: Erro no callback de status:", error)
             }
-          } else {
-            setIsConnected(status === "SUBSCRIBED")
-          }
-        })
+          })
+      } catch (error) {
+        console.error("[v0] Realtime WhatsApp: Erro ao configurar subscription:", error)
+        errorCountRef.current++
+        if (errorCountRef.current >= maxRetries) {
+          isCircuitBreakerOpen.current = true
+          startPollingFallback()
+        }
+      }
     }
 
     if (!isLoadingRef.current && alerts.length === 0) {
@@ -202,8 +259,9 @@ export function useRealtimeWhatsAppAlerts(userEmail = "tarcisiorp16@gmail.com"):
         supabase.removeChannel(channelRef.current)
         channelRef.current = null
       }
+      stopPollingFallback()
     }
-  }, [userId, getUserId, loadInitialAlerts, alerts.length])
+  }, [userId, getUserId, loadInitialAlerts, alerts.length, startPollingFallback, stopPollingFallback])
 
   const markAsRead = useCallback(
     async (alertId: string) => {
