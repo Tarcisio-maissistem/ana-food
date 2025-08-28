@@ -573,6 +573,20 @@ const SettingsScreen = () => {
     try {
       if (typeof window !== "undefined" && (window as any).qz) {
         const qz = (window as any).qz
+
+        if (qz.websocket.isActive()) {
+          console.log("[v0] QZ Tray já está conectado")
+          setQzTrayConnected(true)
+          return true
+        }
+
+        try {
+          await qz.websocket.disconnect()
+        } catch (disconnectError) {
+          // Ignore disconnect errors if no connection exists
+          console.log("[v0] Nenhuma conexão anterior para desconectar")
+        }
+
         await qz.websocket.connect()
         setQzTrayConnected(true)
         console.log("[v0] QZ Tray conectado com sucesso")
