@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { qz } from "qz-tray" // Declare the qz variable
 
 import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,6 +12,7 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Building2,
   Bell,
@@ -23,6 +25,7 @@ import {
   Loader2,
   AlertCircle,
   AlertTriangle,
+  Printer,
 } from "lucide-react"
 import { toast } from "react-hot-toast"
 import { useUser } from "./main-dashboard"
@@ -69,6 +72,24 @@ interface EmpresaData {
   address?: string
   phone?: string
   email?: string
+}
+
+interface PrinterConfig {
+  id: string
+  name: string
+  type: "USB" | "Rede" | "Bluetooth"
+  status: "Conectada" | "Desconectada" | "Erro"
+  model: string
+  port?: string
+  ip?: string
+  sector: string
+}
+
+interface PrinterSector {
+  id: string
+  name: string
+  printer_id?: string
+  active: boolean
 }
 
 const EVOLUTION_API_BASE_URL = "https://evo.anafood.vip"
@@ -143,6 +164,15 @@ const SettingsScreen = () => {
   const [isSendingTest, setIsSendingTest] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const [printers, setPrinters] = useState<PrinterConfig[]>([])
+  const [printerSectors, setPrinterSectors] = useState<PrinterSector[]>([])
+  const [qzTrayConnected, setQzTrayConnected] = useState(false)
+  const [isLoadingPrinters, setIsLoadingPrinters] = useState(false)
+  const [selectedPrinter, setSelectedPrinter] = useState<PrinterConfig | null>(null)
+  const [isPrinterDialogOpen, setIsPrinterDialogOpen] = useState(false)
+  const [selectedSector, setSelectedSector] = useState<PrinterSector | null>(null)
+  const [isSectorDialogOpen, setIsSectorDialogOpen] = useState(false)
 
   const loadEmpresaData = async () => {
     try {
@@ -421,7 +451,11 @@ const SettingsScreen = () => {
         setWhatsappSession((prev) => ({
           ...prev,
           status:
-            connectionState === "open" ? "connected" : connectionState === "connecting" ? "connecting" : "disconnected",
+            connectionState === "open" || connectionState === "connected"
+              ? "connected"
+              : connectionState === "connecting"
+                ? "connecting"
+                : "disconnected",
           lastUpdate: new Date(),
           error: undefined,
         }))
@@ -513,8 +547,162 @@ const SettingsScreen = () => {
     await createNewInstance(cnpjInstance)
   }
 
+  const checkQzTrayConnection = async () => {
+    try {
+      // @ts-ignore
+      if (typeof qz !== "undefined") {
+        // @ts-ignore
+        await qz.websocket.connect()
+        setQzTrayConnected(true)
+        console.log("[v0] QZ Tray conectado com sucesso")
+        return true
+      } else {
+        console.log("[v0] QZ Tray não encontrado")
+        setQzTrayConnected(false)
+        return false
+      }
+    } catch (error) {
+      console.error("[v0] Erro ao conectar QZ Tray:", error)
+      setQzTrayConnected(false)
+      return false
+    }
+  }
+
+  const loadWindowsPrinters = async () => {
+    if (!qzTrayConnected) {
+      const connected = await checkQzTrayConnection()
+      if (!connected) {
+        toast.error("QZ Tray não está conectado. Instale e execute o QZ Tray.")
+        return []
+      }
+    }
+
+    try {
+      // @ts-ignore
+      const printerList = await qz.printers.find()
+      console.log("[v0] Impressoras do Windows encontradas:", printerList)
+      return printerList
+    } catch (error) {
+      console.error("[v0] Erro ao buscar impressoras do Windows:", error)
+      toast.error("Erro ao buscar impressoras do sistema")
+      return []
+    }
+  }
+
+  const loadPrinters = async () => {
+    setIsLoadingPrinters(true)
+    try {
+      const response = await fetch("/api/printers", {
+        headers: {
+          "x-user-email": user?.email || "tarcisiorp16@gmail.com",
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setPrinters(Array.isArray(data) ? data : [])
+      } else {
+        console.error("Erro ao carregar impressoras:", response.status)
+        setPrinters([])
+      }
+    } catch (error) {
+      console.error("Erro ao carregar impressoras:", error)
+      setPrinters([])
+    } finally {
+      setIsLoadingPrinters(false)
+    }
+  }
+
+  const loadPrinterSectors = async () => {
+    try {
+      // Load default sectors if none exist
+      const defaultSectors = [
+        { id: "caixa", name: "Caixa", active: true },
+        { id: "cozinha", name: "Cozinha", active: true },
+        { id: "cozinha2", name: "Cozinha 2", active: true },
+        { id: "bar", name: "Bar/Copa", active: true },
+        { id: "bebidas", name: "Bebidas", active: true },
+      ]
+      setPrinterSectors(defaultSectors)
+    } catch (error) {
+      console.error("Erro ao carregar setores:", error)
+    }
+  }
+
+  const syncWithQzTray = async () => {
+    const windowsPrinters = await loadWindowsPrinters()
+    if (windowsPrinters.length === 0) return
+
+    toast.success(`${windowsPrinters.length} impressoras encontradas no sistema`)
+
+    // Here you could automatically create printer configs based on Windows printers
+    // For now, we'll just show the available printers
+    console.log("[v0] Impressoras disponíveis para configuração:", windowsPrinters)
+  }
+
+  const handleSavePrinter = async (printerData: Partial<PrinterConfig>) => {
+    try {
+      const method = selectedPrinter ? "PUT" : "POST"
+      const response = await fetch("/api/printers", {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-email": user?.email || "tarcisiorp16@gmail.com",
+        },
+        body: JSON.stringify(selectedPrinter ? { id: selectedPrinter.id, ...printerData } : printerData),
+      })
+
+      if (response.ok) {
+        toast.success(selectedPrinter ? "Impressora atualizada!" : "Impressora adicionada!")
+        setIsPrinterDialogOpen(false)
+        setSelectedPrinter(null)
+        loadPrinters()
+      } else {
+        throw new Error("Erro na resposta da API")
+      }
+    } catch (error) {
+      console.error("Erro ao salvar impressora:", error)
+      toast.error("Erro ao salvar impressora")
+    }
+  }
+
+  const handleDeletePrinter = async (printerId: string) => {
+    if (!confirm("Tem certeza que deseja excluir esta impressora?")) return
+
+    try {
+      const response = await fetch(`/api/printers?id=${printerId}`, {
+        method: "DELETE",
+        headers: {
+          "x-user-email": user?.email || "tarcisiorp16@gmail.com",
+        },
+      })
+
+      if (response.ok) {
+        toast.success("Impressora removida!")
+        loadPrinters()
+      } else {
+        throw new Error("Erro na resposta da API")
+      }
+    } catch (error) {
+      console.error("Erro ao excluir impressora:", error)
+      toast.error("Erro ao excluir impressora")
+    }
+  }
+
+  const updateSectorPrinter = (sectorId: string, printerId: string) => {
+    setPrinterSectors((prev) =>
+      prev.map((sector) =>
+        sector.id === sectorId ? { ...sector, printer_id: printerId === "none" ? undefined : printerId } : sector,
+      ),
+    )
+    toast.success("Configuração do setor atualizada!")
+  }
+
   useEffect(() => {
     loadEmpresaData()
+    loadPrinters()
+    loadPrinterSectors()
+    checkQzTrayConnection()
   }, [])
 
   return (
@@ -528,7 +716,7 @@ const SettingsScreen = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="perfil" className="flex items-center gap-2">
             <User className="w-4 h-4" />
             <span className="hidden sm:inline">Perfil</span>
@@ -536,6 +724,10 @@ const SettingsScreen = () => {
           <TabsTrigger value="estabelecimento" className="flex items-center gap-2">
             <Building2 className="w-4 h-4" />
             <span className="hidden sm:inline">Estabelecimento</span>
+          </TabsTrigger>
+          <TabsTrigger value="impressoras" className="flex items-center gap-2">
+            <Printer className="w-4 h-4" />
+            <span className="hidden sm:inline">Impressoras</span>
           </TabsTrigger>
           <TabsTrigger value="notifications" className="flex items-center gap-2">
             <Bell className="w-4 h-4" />
@@ -685,7 +877,6 @@ const SettingsScreen = () => {
                   <div className="flex items-center gap-4">
                     <div>
                       <div className="flex items-center gap-2 mb-2">
-                        
                         {whatsappSession.status === "open" || whatsappSession.status === "connected" ? (
                           <Badge variant="secondary" className="bg-green-100 text-green-800">
                             <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse" />
@@ -978,6 +1169,123 @@ const SettingsScreen = () => {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+function PrinterDialog({
+  printer,
+  onSave,
+  onClose,
+}: {
+  printer: PrinterConfig | null
+  onSave: (data: Partial<PrinterConfig>) => void
+  onClose: () => void
+}) {
+  const [formData, setFormData] = useState({
+    name: printer?.name || "",
+    type: printer?.type || ("USB" as const),
+    model: printer?.model || "",
+    port: printer?.port || "",
+    ip: printer?.ip || "",
+    sector: printer?.sector || "Cozinha",
+  })
+
+  const sectors = ["Caixa", "Cozinha", "Cozinha 2", "Bar/Copa", "Bebidas"]
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.name.trim() || !formData.model.trim()) return
+    onSave(formData)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <Label htmlFor="printer-name">Nome da Impressora</Label>
+        <Input
+          id="printer-name"
+          value={formData.name}
+          onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+          placeholder="Ex: Impressora Cozinha"
+          required
+        />
+      </div>
+
+      <div>
+        <Label htmlFor="printer-type">Tipo de Conexão</Label>
+        <Select
+          value={formData.type}
+          onValueChange={(value: "USB" | "Rede" | "Bluetooth") => setFormData((prev) => ({ ...prev, type: value }))}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="USB">USB</SelectItem>
+            <SelectItem value="Rede">Rede (IP)</SelectItem>
+            <SelectItem value="Bluetooth">Bluetooth</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <Label htmlFor="printer-model">Modelo</Label>
+        <Input
+          id="printer-model"
+          value={formData.model}
+          onChange={(e) => setFormData((prev) => ({ ...prev, model: e.target.value }))}
+          placeholder="Ex: TM-T20, MP-100S TH"
+          required
+        />
+      </div>
+
+      {formData.type === "USB" ? (
+        <div>
+          <Label htmlFor="printer-port">Porta USB</Label>
+          <Input
+            id="printer-port"
+            value={formData.port}
+            onChange={(e) => setFormData((prev) => ({ ...prev, port: e.target.value }))}
+            placeholder="Ex: USB001, COM1"
+          />
+        </div>
+      ) : (
+        <div>
+          <Label htmlFor="printer-ip">Endereço IP</Label>
+          <Input
+            id="printer-ip"
+            value={formData.ip}
+            onChange={(e) => setFormData((prev) => ({ ...prev, ip: e.target.value }))}
+            placeholder="Ex: 192.168.1.100"
+          />
+        </div>
+      )}
+
+      <div>
+        <Label htmlFor="printer-sector">Setor</Label>
+        <Select value={formData.sector} onValueChange={(value) => setFormData((prev) => ({ ...prev, sector: value }))}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {sectors.map((sector) => (
+              <SelectItem key={sector} value={sector}>
+                {sector}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex gap-2 pt-4">
+        <Button type="button" variant="outline" onClick={onClose} className="flex-1 bg-transparent">
+          Cancelar
+        </Button>
+        <Button type="submit" className="flex-1">
+          Salvar
+        </Button>
+      </div>
+    </form>
   )
 }
 

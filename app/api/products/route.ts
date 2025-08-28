@@ -351,11 +351,7 @@ export async function PUT(request: NextRequest) {
       const fieldMapping: { [key: string]: string } = {
         name: availableColumns.includes("name") ? "name" : availableColumns.includes("nome") ? "nome" : "",
         price: availableColumns.includes("price") ? "price" : availableColumns.includes("preco") ? "preco" : "",
-        category: availableColumns.includes("category")
-          ? "category"
-          : availableColumns.includes("categoria")
-            ? "categoria"
-            : "",
+        category_id: availableColumns.includes("category_id") ? "category_id" : "", // Added category_id mapping
         description: availableColumns.includes("description")
           ? "description"
           : availableColumns.includes("descricao")

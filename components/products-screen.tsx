@@ -37,7 +37,7 @@ import { AuditLogger } from "@/lib/audit-logger"
 interface Product {
   id: string
   name: string
-  category: string
+  category_id: string // Changed from category: string to category_id: string
   price: number
   description?: string
   image?: string
@@ -979,7 +979,7 @@ function ProductDialog({
 }) {
   const [formData, setFormData] = useState({
     name: "",
-    category: "",
+    category_id: "", // Changed from category to category_id
     price: 0,
     description: "",
     on_off: true,
@@ -995,7 +995,7 @@ function ProductDialog({
     if (product) {
       setFormData({
         name: product.name || "",
-        category: product.category || "",
+        category_id: product.category_id || "", // Changed from category to category_id
         price: product.price || 0,
         description: product.description || "",
         on_off: product.on_off ?? true,
@@ -1006,7 +1006,7 @@ function ProductDialog({
     } else {
       setFormData({
         name: "",
-        category: "",
+        category_id: "", // Changed from category to category_id
         price: 0,
         description: "",
         on_off: true,
@@ -1056,8 +1056,8 @@ function ProductDialog({
       newErrors.name = "Nome deve ter no máximo 100 caracteres"
     }
 
-    if (!formData.category) {
-      newErrors.category = "Categoria é obrigatória"
+    if (!formData.category_id) {
+      newErrors.category_id = "Categoria é obrigatória" // Changed from category to category_id
     }
 
     if (!formData.price || formData.price <= 0) {
@@ -1135,19 +1135,19 @@ function ProductDialog({
 
           <div>
             <label className="text-sm font-medium">Categoria *</label>
-            <Select value={formData.category} onValueChange={(value) => handleFieldChange("category", value)}>
-              <SelectTrigger className={errors.category ? "border-red-500" : ""}>
+            <Select value={formData.category_id} onValueChange={(value) => handleFieldChange("category_id", value)}>
+              <SelectTrigger className={errors.category_id ? "border-red-500" : ""}>
                 <SelectValue placeholder="Selecione uma categoria" />
               </SelectTrigger>
               <SelectContent>
                 {categoriesList.map((category) => (
-                  <SelectItem key={category.id} value={category.name}>
+                  <SelectItem key={category.id} value={category.id}>
                     {category.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {errors.category && <p className="text-red-500 text-xs mt-1">{errors.category}</p>}
+            {errors.category_id && <p className="text-red-500 text-xs mt-1">{errors.category_id}</p>}
           </div>
 
           <div>
