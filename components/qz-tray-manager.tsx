@@ -7,10 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Printer, TestTube, RefreshCw, Wifi, WifiOff, Eye, Edit3 } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Printer, TestTube, RefreshCw, Wifi, WifiOff, Settings } from "lucide-react"
 import qzTrayService from "@/lib/qz-tray-service"
+import PrinterLayoutEditor from "@/components/printer-layout-editor"
 
 interface QZTrayManagerProps {
   companyData?: any
@@ -29,6 +29,7 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
   })
 
   const [savingSettings, setSavingSettings] = useState(false)
+  const [printerLayout, setPrinterLayout] = useState(null)
 
   useEffect(() => {
     loadPrinterSettings()
@@ -247,6 +248,30 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
     }
   }
 
+  const handleLayoutChange = (layout) => {
+    setPrinterLayout(layout)
+    // Update QZ Tray service with new layout
+    qzTrayService.updatePrintLayout(layout)
+  }
+
+  const handleLayoutTestPrint = async (layout) => {
+    if (!selectedPrinter) {
+      alert("Selecione uma impressora primeiro!")
+      return
+    }
+
+    setLoading(true)
+    try {
+      await qzTrayService.testPrintWithLayout(layout, companyData)
+      alert("Teste de impressão com layout personalizado enviado!")
+    } catch (error) {
+      console.error("[v0] Erro no teste de impressão:", error)
+      alert("Erro ao enviar teste de impressão: " + error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const [sampleOrder, setSampleOrder] = useState({
     id: "PED-001",
     customerName: "João Silva",
@@ -366,159 +391,72 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
       {/* Print Settings */}
       <Card>
         <CardHeader>
-          <CardTitle>Configurações de Impressão</CardTitle>
-          <CardDescription>Personalize o que será impresso nos pedidos</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="show-logo"
-                checked={printSettings.showLogo}
-                onCheckedChange={(checked) => handleSettingChange("showLogo", checked)}
-              />
-              <Label htmlFor="show-logo">Mostrar Logo</Label>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="show-title"
-                checked={printSettings.showTitle}
-                onCheckedChange={(checked) => handleSettingChange("showTitle", checked)}
-              />
-              <Label htmlFor="show-title">Mostrar Título</Label>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="show-address"
-                checked={printSettings.showAddress}
-                onCheckedChange={(checked) => handleSettingChange("showAddress", checked)}
-              />
-              <Label htmlFor="show-address">Mostrar Endereço</Label>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="show-phone"
-                checked={printSettings.showPhone}
-                onCheckedChange={(checked) => handleSettingChange("showPhone", checked)}
-              />
-              <Label htmlFor="show-phone">Mostrar Telefone</Label>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Eye className="h-5 w-5" />
-            Pré-visualização do Pedido
+            <Settings className="h-5 w-5" />
+            Configurações de Impressão
           </CardTitle>
-          <CardDescription>Visualize como o pedido será impresso e edite os dados de exemplo</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Sample Order Editor */}
-            <div className="space-y-4">
-              <h4 className="font-medium flex items-center gap-2">
-                <Edit3 className="h-4 w-4" />
-                Dados do Pedido de Exemplo
-              </h4>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label htmlFor="order-id">Número do Pedido</Label>
-                  <Input
-                    id="order-id"
-                    value={sampleOrder.id}
-                    onChange={(e) => setSampleOrder({ ...sampleOrder, id: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="customer-name">Nome do Cliente</Label>
-                  <Input
-                    id="customer-name"
-                    value={sampleOrder.customerName}
-                    onChange={(e) => setSampleOrder({ ...sampleOrder, customerName: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label htmlFor="customer-phone">Telefone</Label>
-                  <Input
-                    id="customer-phone"
-                    value={sampleOrder.customerPhone}
-                    onChange={(e) => setSampleOrder({ ...sampleOrder, customerPhone: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="payment-method">Forma de Pagamento</Label>
-                  <Input
-                    id="payment-method"
-                    value={sampleOrder.paymentMethod}
-                    onChange={(e) => setSampleOrder({ ...sampleOrder, paymentMethod: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="customer-address">Endereço de Entrega</Label>
-                <Input
-                  id="customer-address"
-                  value={sampleOrder.customerAddress}
-                  onChange={(e) => setSampleOrder({ ...sampleOrder, customerAddress: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="observations">Observações</Label>
-                <Textarea
-                  id="observations"
-                  value={sampleOrder.observations}
-                  onChange={(e) => setSampleOrder({ ...sampleOrder, observations: e.target.value })}
-                  rows={2}
-                />
-              </div>
-            </div>
-
-            {/* Print Preview */}
-            <div className="space-y-4">
-              <h4 className="font-medium">Pré-visualização da Impressão</h4>
-              <div className="bg-gray-50 p-4 rounded-lg border">
-                <pre className="text-xs font-mono whitespace-pre-wrap leading-tight">{generatePreview()}</pre>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Test Print */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TestTube className="h-5 w-5" />
-            Teste de Impressão
-          </CardTitle>
-          <CardDescription>Envie o pedido de exemplo para a impressora selecionada</CardDescription>
+          <CardDescription>Configure o layout e aparência dos cupons impressos</CardDescription>
         </CardHeader>
         <CardContent>
-          <Button onClick={handleTestPrint} disabled={loading || !isConnected || !selectedPrinter} className="w-full">
-            {loading ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <TestTube className="h-4 w-4 mr-2" />}
-            Imprimir Teste
-          </Button>
+          <Tabs defaultValue="simple" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="simple">Configuração Simples</TabsTrigger>
+              <TabsTrigger value="advanced">Editor de Layout</TabsTrigger>
+            </TabsList>
 
-          {!isConnected && (
-            <p className="text-sm text-red-600 mt-2">
-              QZ Tray não está rodando. Instale o QZ Tray para detectar impressoras do Windows.
-            </p>
-          )}
-          {!selectedPrinter && isConnected && (
-            <p className="text-sm text-orange-600 mt-2">Selecione uma impressora primeiro</p>
-          )}
+            <TabsContent value="simple" className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="show-logo"
+                    checked={printSettings.showLogo}
+                    onCheckedChange={(checked) => handleSettingChange("showLogo", checked)}
+                  />
+                  <Label htmlFor="show-logo">Mostrar Logo</Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="show-title"
+                    checked={printSettings.showTitle}
+                    onCheckedChange={(checked) => handleSettingChange("showTitle", checked)}
+                  />
+                  <Label htmlFor="show-title">Mostrar Título</Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="show-address"
+                    checked={printSettings.showAddress}
+                    onCheckedChange={(checked) => handleSettingChange("showAddress", checked)}
+                  />
+                  <Label htmlFor="show-address">Mostrar Endereço</Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="show-phone"
+                    checked={printSettings.showPhone}
+                    onCheckedChange={(checked) => handleSettingChange("showPhone", checked)}
+                  />
+                  <Label htmlFor="show-phone">Mostrar Telefone</Label>
+                </div>
+              </div>
+
+              <Button
+                onClick={handleTestPrint}
+                disabled={loading || !isConnected || !selectedPrinter}
+                className="w-full"
+              >
+                {loading ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <TestTube className="h-4 w-4 mr-2" />}
+                Teste de Impressão Simples
+              </Button>
+            </TabsContent>
+
+            <TabsContent value="advanced">
+              <PrinterLayoutEditor onLayoutChange={handleLayoutChange} onTestPrint={handleLayoutTestPrint} />
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </div>
