@@ -279,12 +279,18 @@ export function OrdersKanban() {
     try {
       console.log("[v0] Imprimindo pedido:", order.number)
 
+      console.log("[v0] Verificando conexão QZ Tray...")
+      const isConnected = qzTrayService.isQzTrayConnected()
+      console.log("[v0] QZ Tray conectado:", isConnected)
+
       // Check if QZ Tray is connected
-      if (!qzTrayService.isQzTrayConnected()) {
+      if (!isConnected) {
+        console.log("[v0] QZ Tray não conectado, mostrando erro")
         toast.error("QZ Tray não está conectado. Configure as impressoras nas configurações.")
         return
       }
 
+      console.log("[v0] Formatando dados do pedido...")
       // Format order data for printing
       const orderData = {
         id: order.number,
@@ -312,7 +318,12 @@ export function OrdersKanban() {
         observations: order.observations,
       }
 
+      console.log("[v0] Dados do pedido formatados:", orderData)
+      console.log("[v0] Enviando para QZ Tray service...")
+
       await qzTrayService.printOrder(orderData)
+
+      console.log("[v0] Impressão enviada com sucesso")
       toast.success(`Pedido #${order.number} enviado para impressão`)
     } catch (error) {
       console.error("[v0] Erro ao imprimir pedido:", error)
