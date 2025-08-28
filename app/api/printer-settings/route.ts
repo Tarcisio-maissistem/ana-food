@@ -70,11 +70,16 @@ export async function POST(request: NextRequest) {
       showPhone: showPhone !== undefined ? showPhone : true,
     }
 
-    const { error } = await supabase.from("user_settings").upsert({
-      user_id: user.id,
-      key: "printer_settings",
-      value: printerSettings,
-    })
+    const { error } = await supabase.from("user_settings").upsert(
+      {
+        user_id: user.id,
+        key: "printer_settings",
+        value: printerSettings,
+      },
+      {
+        onConflict: "user_id,key",
+      },
+    )
 
     if (error) {
       console.error("Erro ao salvar configurações de impressora:", error)
