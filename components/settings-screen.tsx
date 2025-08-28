@@ -88,8 +88,9 @@ interface PrinterConfig {
 interface PrinterSector {
   id: string
   name: string
-  printer_id?: string
+  printer_name?: string | null
   active: boolean
+  user_id?: string
 }
 
 const EVOLUTION_API_BASE_URL = "https://evo.anafood.vip"
@@ -173,6 +174,7 @@ const SettingsScreen = () => {
   const [isPrinterDialogOpen, setIsPrinterDialogOpen] = useState(false)
   const [selectedSector, setSelectedSector] = useState<PrinterSector | null>(null)
   const [isSectorDialogOpen, setIsSectorDialogOpen] = useState(false)
+  const [availablePrinters, setAvailablePrinters] = useState<{ name: string; status: string }[]>([])
 
   const loadEmpresaData = async () => {
     try {
@@ -615,17 +617,22 @@ const SettingsScreen = () => {
 
   const loadPrinterSectors = async () => {
     try {
-      // Load default sectors if none exist
-      const defaultSectors = [
-        { id: "caixa", name: "Caixa", active: true },
-        { id: "cozinha", name: "Cozinha", active: true },
-        { id: "cozinha2", name: "Cozinha 2", active: true },
-        { id: "bar", name: "Bar/Copa", active: true },
-        { id: "bebidas", name: "Bebidas", active: true },
-      ]
-      setPrinterSectors(defaultSectors)
+      const response = await fetch("/api/print-locations", {
+        headers: {
+          "x-user-email": user?.email || "tarcisiorp16@gmail.com",
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setPrinterSectors(Array.isArray(data) ? data : [])
+      } else {
+        console.error("Erro ao carregar setores de impressão:", response.status)
+        setPrinterSectors([])
+      }
     } catch (error) {
       console.error("Erro ao carregar setores:", error)
+      setPrinterSectors([])
     }
   }
 
@@ -635,9 +642,82 @@ const SettingsScreen = () => {
 
     toast.success(`${windowsPrinters.length} impressoras encontradas no sistema`)
 
-    // Here you could automatically create printer configs based on Windows printers
-    // For now, we'll just show the available printers
+    setAvailablePrinters(windowsPrinters.map((name) => ({ name, status: "Disponível" })))
     console.log("[v0] Impressoras disponíveis para configuração:", windowsPrinters)
+  }
+
+  const handleUpdateSector = async (sectorId: string, printerName: string | null) => {
+    try {
+      const response = await fetch("/api/print-locations", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-email": user?.email || "tarcisiorp16@gmail.com",
+        },
+        body: JSON.stringify({
+          id: sectorId,
+          printer_name: printerName,
+          active: true,
+        }),
+      })
+
+      if (response.ok) {
+        await loadPrinterSectors()
+        toast.success("Setor atualizado com sucesso!")
+      } else {
+        toast.error("Erro ao atualizar setor")
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar setor:", error)
+      toast.error("Erro ao atualizar setor")
+    }
+  }
+
+  const handleAddSector = async (sectorName: string) => {
+    try {
+      const response = await fetch("/api/print-locations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-email": user?.email || "tarcisiorp16@gmail.com",
+        },
+        body: JSON.stringify({
+          name: sectorName,
+          active: true,
+        }),
+      })
+
+      if (response.ok) {
+        await loadPrinterSectors()
+        toast.success("Setor adicionado com sucesso!")
+      } else {
+        toast.error("Erro ao adicionar setor")
+      }
+    } catch (error) {
+      console.error("Erro ao adicionar setor:", error)
+      toast.error("Erro ao adicionar setor")
+    }
+  }
+
+  const handleDeleteSector = async (sectorId: string) => {
+    try {
+      const response = await fetch(`/api/print-locations?id=${sectorId}`, {
+        method: "DELETE",
+        headers: {
+          "x-user-email": user?.email || "tarcisiorp16@gmail.com",
+        },
+      })
+
+      if (response.ok) {
+        await loadPrinterSectors()
+        toast.success("Setor removido com sucesso!")
+      } else {
+        toast.error("Erro ao remover setor")
+      }
+    } catch (error) {
+      console.error("Erro ao remover setor:", error)
+      toast.error("Erro ao remover setor")
+    }
   }
 
   const handleSavePrinter = async (printerData: Partial<PrinterConfig>) => {

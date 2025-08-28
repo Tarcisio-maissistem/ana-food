@@ -83,3 +83,74 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
+
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const userEmail = request.headers.get("x-user-email") || "tarcisiorp16@gmail.com"
+
+    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+
+    // Buscar usuário por email
+    const { data: user } = await supabase.from("users").select("id").eq("email", userEmail).single()
+
+    if (!user) {
+      return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 })
+    }
+
+    const { data: updatedLocation, error } = await supabase
+      .from("print_locations")
+      .update({
+        name: body.name,
+        printer_name: body.printer_name || null,
+        active: body.active,
+      })
+      .eq("id", body.id)
+      .eq("user_id", user.id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error("[v0] API Print Locations: Erro ao atualizar:", error)
+      return NextResponse.json({ error: "Erro ao atualizar local de impressão" }, { status: 500 })
+    }
+
+    return NextResponse.json(updatedLocation)
+  } catch (error) {
+    console.error("[v0] API Print Locations: Erro:", error)
+    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get("id")
+    const userEmail = request.headers.get("x-user-email") || "tarcisiorp16@gmail.com"
+
+    if (!id) {
+      return NextResponse.json({ error: "ID é obrigatório" }, { status: 400 })
+    }
+
+    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+
+    // Buscar usuário por email
+    const { data: user } = await supabase.from("users").select("id").eq("email", userEmail).single()
+
+    if (!user) {
+      return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 })
+    }
+
+    const { error } = await supabase.from("print_locations").delete().eq("id", id).eq("user_id", user.id)
+
+    if (error) {
+      console.error("[v0] API Print Locations: Erro ao deletar:", error)
+      return NextResponse.json({ error: "Erro ao deletar local de impressão" }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error("[v0] API Print Locations: Erro:", error)
+    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
+  }
+}
