@@ -10,16 +10,17 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Criar tabela empresas se não existir
-CREATE TABLE IF NOT EXISTS empresas (
+-- Using existing companies table instead of empresas
+-- Criar tabela companies se não existir (reutilizando tabela existente)
+CREATE TABLE IF NOT EXISTS companies (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    nome VARCHAR(255) NOT NULL,
+    name VARCHAR(255) NOT NULL,
     cnpj VARCHAR(18) UNIQUE NOT NULL,
-    telefone VARCHAR(20),
-    endereco TEXT,
+    phone VARCHAR(20),
+    address TEXT,
     email VARCHAR(255),
     logo_url TEXT,
-    ativo BOOLEAN DEFAULT true,
+    active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
@@ -47,10 +48,11 @@ CREATE TABLE IF NOT EXISTS system_settings (
   UNIQUE(key)
 );
 
+-- Updated foreign key reference to use companies table
 -- Configurações por empresa (overrides)
 CREATE TABLE IF NOT EXISTS company_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID NOT NULL REFERENCES empresas(id),
+  company_id UUID NOT NULL REFERENCES companies(id),
   key VARCHAR(100) NOT NULL,
   value TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -69,10 +71,11 @@ CREATE TABLE IF NOT EXISTS user_settings (
   UNIQUE(user_id, key)
 );
 
+-- Updated foreign key reference to use companies table
 -- Tabela dedicada para impressoras
 CREATE TABLE IF NOT EXISTS printers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID NOT NULL REFERENCES empresas(id),
+  company_id UUID NOT NULL REFERENCES companies(id),
   name VARCHAR(255) NOT NULL,
   printer_name VARCHAR(255) NOT NULL, -- Nome real da impressora no sistema
   layout JSONB DEFAULT '{}',
@@ -85,6 +88,7 @@ CREATE TABLE IF NOT EXISTS printers (
   UNIQUE(company_id, name)
 );
 
+-- Changed changed_by to TEXT type to match auth.uid() return type
 -- Auditoria de mudanças
 CREATE TABLE IF NOT EXISTS settings_audit (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -93,7 +97,7 @@ CREATE TABLE IF NOT EXISTS settings_audit (
   key VARCHAR(100) NOT NULL,
   old_value TEXT,
   new_value TEXT,
-  changed_by UUID, -- Explicitly set as UUID type
+  changed_by TEXT, -- Changed to TEXT to match auth.uid() return type
   changed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -115,16 +119,16 @@ ALTER TABLE company_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE printers ENABLE ROW LEVEL SECURITY;
 
--- Fixed RLS policies with explicit UUID casting
--- Políticas RLS com casting explícito para evitar erros de tipo
+-- Fixed RLS policies by converting UUID to TEXT for comparison with auth.uid()
+-- Políticas RLS corrigidas convertendo UUID para TEXT para comparação com auth.uid()
 CREATE POLICY "Users can access company settings" ON company_settings
-  FOR ALL USING (auth.uid()::UUID IS NOT NULL);
+  FOR ALL USING (auth.uid() IS NOT NULL);
 
 CREATE POLICY "Users can access their own settings" ON user_settings
-  FOR ALL USING (user_id = auth.uid()::UUID);
+  FOR ALL USING (user_id::TEXT = auth.uid());
 
 CREATE POLICY "Users can access printers" ON printers
-  FOR ALL USING (auth.uid()::UUID IS NOT NULL);
+  FOR ALL USING (auth.uid() IS NOT NULL);
 
 -- Função para resolver herança de configurações
 CREATE OR REPLACE FUNCTION get_effective_setting(
@@ -161,8 +165,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Fixed audit trigger with explicit UUID casting
--- Trigger para auditoria com casting explícito
+-- Fixed audit trigger by removing UUID casting from auth.uid()
+-- Trigger para auditoria corrigido removendo casting UUID do auth.uid()
 CREATE OR REPLACE FUNCTION audit_settings_changes() RETURNS TRIGGER AS $$
 BEGIN
   INSERT INTO settings_audit (table_name, record_id, key, old_value, new_value, changed_by)
@@ -172,7 +176,7 @@ BEGIN
     COALESCE(NEW.key, OLD.key),
     CASE WHEN TG_OP = 'DELETE' THEN OLD.value ELSE NULL END,
     CASE WHEN TG_OP = 'INSERT' THEN NEW.value WHEN TG_OP = 'UPDATE' THEN NEW.value ELSE NULL END,
-    auth.uid()::UUID -- Explicit UUID casting
+    auth.uid() -- Removed UUID casting since changed_by is now TEXT
   );
   RETURN COALESCE(NEW, OLD);
 END;
