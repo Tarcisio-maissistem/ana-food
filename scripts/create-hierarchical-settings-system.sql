@@ -90,13 +90,13 @@ ALTER TABLE printers ENABLE ROW LEVEL SECURITY;
 
 -- Políticas RLS (ajustar conforme sua estrutura de autenticação)
 CREATE POLICY "Users can access their company settings" ON company_settings
-  FOR ALL USING (company_id IN (SELECT company_id FROM user_companies WHERE user_id = auth.uid()));
+  FOR ALL USING (company_id IN (SELECT id FROM companies WHERE user_id = auth.uid()));
 
 CREATE POLICY "Users can access their own settings" ON user_settings
   FOR ALL USING (user_id = auth.uid());
 
 CREATE POLICY "Users can access their company printers" ON printers
-  FOR ALL USING (company_id IN (SELECT company_id FROM user_companies WHERE user_id = auth.uid()));
+  FOR ALL USING (company_id IN (SELECT id FROM companies WHERE user_id = auth.uid()));
 
 -- Função para resolver herança de configurações
 CREATE OR REPLACE FUNCTION get_effective_setting(
