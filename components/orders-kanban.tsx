@@ -528,10 +528,9 @@ export function OrdersKanban() {
       } else {
         setQzTrayConnected(false)
         if (connected && connected.error) {
-          // Handle timeout errors more gracefully
-          if (connected.error.includes("timeout") || connected.error.includes("demorou")) {
-            setQzTrayStatus("QZ Tray lento - Tente novamente")
-            console.warn("[v0] QZ Tray connection timeout - printer functionality may be limited")
+          if (connected.error.includes("timeout") || connected.error.includes("não respondeu")) {
+            setQzTrayStatus("QZ Tray indisponível")
+            // Don't log timeout errors as they're expected when QZ Tray isn't running
           } else if (connected.error.includes("não está rodando")) {
             setQzTrayStatus("QZ Tray não iniciado")
           } else {
@@ -542,13 +541,12 @@ export function OrdersKanban() {
         }
       }
     } catch (error) {
-      console.warn("[v0] QZ Tray validation failed:", error.message)
       setQzTrayConnected(false)
-      // Don't show error status for timeout issues to avoid user confusion
       if (error.message.includes("timeout")) {
         setQzTrayStatus("QZ Tray indisponível")
       } else {
         setQzTrayStatus("Erro de conexão")
+        console.warn("[v0] QZ Tray validation failed:", error.message)
       }
     }
   }
