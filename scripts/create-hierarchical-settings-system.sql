@@ -1,3 +1,29 @@
+-- Adding table dependencies to prevent foreign key errors
+-- Criar tabela de usuários se não existir
+CREATE TABLE IF NOT EXISTS users (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  role VARCHAR(50) DEFAULT 'user',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Criar tabela empresas se não existir
+CREATE TABLE IF NOT EXISTS empresas (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    nome VARCHAR(255) NOT NULL,
+    cnpj VARCHAR(18) UNIQUE NOT NULL,
+    telefone VARCHAR(20),
+    endereco TEXT,
+    email VARCHAR(255),
+    logo_url TEXT,
+    ativo BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
 -- Catálogo de configurações para validação e documentação
 CREATE TABLE IF NOT EXISTS settings_catalog (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
