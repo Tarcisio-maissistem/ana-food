@@ -9,10 +9,10 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Printer, TestTube, RefreshCw, Wifi, WifiOff, Settings, Eye, Download, Shield } from "lucide-react"
+import { Printer, TestTube, RefreshCw, Wifi, WifiOff, Settings, Eye } from "lucide-react"
 import qzTrayService from "@/lib/qz-tray-service"
 import PrinterLayoutEditor from "@/components/printer-layout-editor"
+import CertificateDownloader from "@/components/certificate-downloader"
 
 interface QZTrayManagerProps {
   companyData?: any
@@ -33,8 +33,6 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
   const [savingSettings, setSavingSettings] = useState(false)
   const [printerLayout, setPrinterLayout] = useState(null)
   const [showPreview, setShowPreview] = useState(false)
-  const [certificateLoading, setCertificateLoading] = useState(false)
-  const [certificateError, setCertificateError] = useState<string | null>(null)
 
   useEffect(() => {
     loadPrinterSettings()
@@ -219,49 +217,6 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
       alert("Erro ao enviar teste de impressão: " + error.message)
     } finally {
       setLoading(false)
-    }
-  }
-
-  const handleCertificateDownload = async () => {
-    if (!companyData?.cnpj) {
-      setCertificateError("CNPJ da empresa não encontrado")
-      return
-    }
-
-    setCertificateLoading(true)
-    setCertificateError(null)
-
-    try {
-      const response = await fetch("/api/generate-cert-token", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-email": "tarcisiorp16@gmail.com",
-        },
-        body: JSON.stringify({ company_id: companyData.cnpj }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || "Falha ao gerar token")
-      }
-
-      const downloadUrl = `https://216.22.5.44:5050/download/${companyData.cnpj}?token=${data.token}`
-
-      const link = document.createElement("a")
-      link.href = downloadUrl
-      link.download = `${companyData.cnpj}-cert.p12`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-
-      alert("Certificado baixado com sucesso! Siga as instruções abaixo para instalar no QZ Tray.")
-    } catch (err: any) {
-      setCertificateError(err.message)
-      console.error("Erro ao baixar certificado:", err)
-    } finally {
-      setCertificateLoading(false)
     }
   }
 
@@ -508,63 +463,16 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
             </TabsContent>
 
             <TabsContent value="certificates" className="space-y-4">
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <Shield className="h-5 w-5 text-blue-500" />
-                  <h3 className="text-lg font-medium">Certificado Digital QZ Tray</h3>
-                </div>
-
-                <p className="text-sm text-gray-600 mb-4">
-                  Cada empresa precisa de um certificado digital para usar o QZ Tray de forma segura. Baixe e instale o
-                  certificado específico da sua empresa.
-                </p>
-
-                <Button
-                  onClick={handleCertificateDownload}
-                  disabled={certificateLoading || !companyData?.cnpj}
-                  className="w-full mb-4"
-                >
-                  {certificateLoading ? (
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Download className="h-4 w-4 mr-2" />
-                  )}
-                  {certificateLoading ? "Baixando..." : "Baixar Certificado QZ Tray"}
-                </Button>
-
-                {certificateError && (
-                  <Alert variant="destructive">
-                    <AlertDescription>Erro: {certificateError}</AlertDescription>
-                  </Alert>
-                )}
-
-                <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <h4 className="font-medium text-blue-800 mb-3">Instruções de Instalação:</h4>
-                  <ol className="text-sm text-blue-700 space-y-2">
-                    <li>1. Abra o QZ Tray (ícone na bandeja do sistema)</li>
-                    <li>2. Clique no ícone de engrenagem (Preferences)</li>
-                    <li>3. Vá para a aba "Security"</li>
-                    <li>4. Clique em "Import" e selecione o arquivo .p12 baixado</li>
-                    <li>
-                      5. Insira a senha: <code className="bg-blue-100 px-1 rounded">senha_padrao</code>
-                    </li>
-                    <li>6. Clique em "OK" e reinicie o QZ Tray</li>
-                    <li>7. Teste a conexão clicando em "Reconectar" acima</li>
-                  </ol>
-                </div>
-
-                <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <h4 className="font-medium text-yellow-800 mb-2">⚠️ Importante:</h4>
-                  <ul className="text-sm text-yellow-700 space-y-1">
-                    <li>
-                      • O certificado é específico para o CNPJ: <strong>{companyData?.cnpj || "Não informado"}</strong>
-                    </li>
-                    <li>• Mantenha o arquivo .p12 em local seguro</li>
-                    <li>• Não compartilhe o certificado com outras empresas</li>
-                    <li>• Em caso de problemas, entre em contato com o suporte</li>
-                  </ul>
-                </div>
-              </div>
+              <CertificateDownloader
+                companyId={companyData?.cnpj || ""}
+                companyName={companyData?.name || companyData?.razao_social || ""}
+                onCertificateInstalled={(companyId) => {
+                  console.log("[v0] Certificado instalado para empresa:", companyId)
+                  setTimeout(() => {
+                    checkConnection()
+                  }, 2000)
+                }}
+              />
             </TabsContent>
           </Tabs>
         </CardContent>
