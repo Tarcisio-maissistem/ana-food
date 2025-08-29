@@ -23,6 +23,7 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
   const [printers, setPrinters] = useState<string[]>([])
   const [selectedPrinter, setSelectedPrinter] = useState<string>("")
   const [loading, setLoading] = useState(false)
+  const [currentCompanyData, setCurrentCompanyData] = useState(companyData)
   const [printSettings, setPrintSettings] = useState({
     showLogo: true,
     showTitle: true,
@@ -37,6 +38,7 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
   useEffect(() => {
     loadPrinterSettings()
     checkConnection()
+    loadCompanyData()
   }, [])
 
   const loadPrinterSettings = async () => {
@@ -155,7 +157,7 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
 
     setLoading(true)
     try {
-      await qzTrayService.printOrder(sampleOrder, companyData)
+      await qzTrayService.printOrder(sampleOrder, currentCompanyData)
       alert("Teste de impressão enviado com sucesso!")
     } catch (error) {
       console.error("[v0] Erro no teste de impressão:", error)
@@ -166,7 +168,7 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
   }
 
   const generatePreview = () => {
-    return qzTrayService.generatePreviewContent(sampleOrder, companyData)
+    return qzTrayService.generatePreviewContent(sampleOrder, currentCompanyData)
   }
 
   const savePrinterSettings = async () => {
@@ -210,7 +212,7 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
 
     setLoading(true)
     try {
-      await qzTrayService.testPrintWithLayout(layout, companyData)
+      await qzTrayService.testPrintWithLayout(layout, currentCompanyData)
       alert("Teste de impressão com layout personalizado enviado!")
     } catch (error) {
       console.error("[v0] Erro no teste de impressão:", error)
@@ -218,6 +220,40 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
     } finally {
       setLoading(false)
     }
+  }
+
+  const loadCompanyData = () => {
+    console.log("[v0] Carregando dados da empresa...")
+    console.log("[v0] CompanyData via props:", companyData)
+
+    let finalCompanyData = companyData
+
+    if (!finalCompanyData || !finalCompanyData.cnpj) {
+      try {
+        const storedCompany = localStorage.getItem("selectedCompany")
+        const storedUser = localStorage.getItem("user")
+
+        console.log("[v0] Dados do localStorage - selectedCompany:", storedCompany)
+        console.log("[v0] Dados do localStorage - user:", storedUser)
+
+        if (storedCompany) {
+          const parsedCompany = JSON.parse(storedCompany)
+          console.log("[v0] Empresa parseada do localStorage:", parsedCompany)
+          finalCompanyData = parsedCompany
+        } else if (storedUser) {
+          const parsedUser = JSON.parse(storedUser)
+          console.log("[v0] Usuário parseado do localStorage:", parsedUser)
+          if (parsedUser.company || parsedUser.empresa) {
+            finalCompanyData = parsedUser.company || parsedUser.empresa
+          }
+        }
+      } catch (error) {
+        console.error("[v0] Erro ao carregar dados da empresa do localStorage:", error)
+      }
+    }
+
+    console.log("[v0] Dados finais da empresa:", finalCompanyData)
+    setCurrentCompanyData(finalCompanyData)
   }
 
   const [sampleOrder, setSampleOrder] = useState({
@@ -463,9 +499,23 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
             </TabsContent>
 
             <TabsContent value="certificates" className="space-y-4">
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <h4 className="font-medium text-blue-800 mb-2">Informações da Empresa:</h4>
+                <p className="text-sm text-blue-700">
+                  <strong>Empresa:</strong>{" "}
+                  {currentCompanyData?.name || currentCompanyData?.razao_social || "Não identificada"}
+                </p>
+                <p className="text-sm text-blue-700">
+                  <strong>CNPJ:</strong> {currentCompanyData?.cnpj || "Não encontrado"}
+                </p>
+                {(!currentCompanyData || !currentCompanyData.cnpj) && (
+                  <p className="text-sm text-orange-600 mt-2">⚠️ CNPJ não encontrado. Selecione uma empresa primeiro.</p>
+                )}
+              </div>
+
               <CertificateDownloader
-                companyId={companyData?.cnpj || ""}
-                companyName={companyData?.name || companyData?.razao_social || ""}
+                companyId={currentCompanyData?.cnpj || ""}
+                companyName={currentCompanyData?.name || currentCompanyData?.razao_social || ""}
                 onCertificateInstalled={(companyId) => {
                   console.log("[v0] Certificado instalado para empresa:", companyId)
                   setTimeout(() => {
