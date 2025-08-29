@@ -37,7 +37,6 @@ CREATE TABLE IF NOT EXISTS settings_catalog (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Removed foreign key references to settings_catalog to avoid type casting issues
 -- Configurações globais do sistema
 CREATE TABLE IF NOT EXISTS system_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -94,7 +93,7 @@ CREATE TABLE IF NOT EXISTS settings_audit (
   key VARCHAR(100) NOT NULL,
   old_value TEXT,
   new_value TEXT,
-  changed_by UUID,
+  changed_by UUID, -- Explicitly set as UUID type
   changed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -116,16 +115,16 @@ ALTER TABLE company_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE printers ENABLE ROW LEVEL SECURITY;
 
--- Simplified RLS policies to avoid type casting issues
--- Políticas RLS simplificadas para usuários autenticados
+-- Fixed RLS policies with explicit UUID casting
+-- Políticas RLS com casting explícito para evitar erros de tipo
 CREATE POLICY "Users can access company settings" ON company_settings
-  FOR ALL USING (auth.uid() IS NOT NULL);
+  FOR ALL USING (auth.uid()::UUID IS NOT NULL);
 
 CREATE POLICY "Users can access their own settings" ON user_settings
-  FOR ALL USING (user_id = auth.uid());
+  FOR ALL USING (user_id = auth.uid()::UUID);
 
 CREATE POLICY "Users can access printers" ON printers
-  FOR ALL USING (auth.uid() IS NOT NULL);
+  FOR ALL USING (auth.uid()::UUID IS NOT NULL);
 
 -- Função para resolver herança de configurações
 CREATE OR REPLACE FUNCTION get_effective_setting(
@@ -162,7 +161,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Trigger para auditoria
+-- Fixed audit trigger with explicit UUID casting
+-- Trigger para auditoria com casting explícito
 CREATE OR REPLACE FUNCTION audit_settings_changes() RETURNS TRIGGER AS $$
 BEGIN
   INSERT INTO settings_audit (table_name, record_id, key, old_value, new_value, changed_by)
@@ -172,7 +172,7 @@ BEGIN
     COALESCE(NEW.key, OLD.key),
     CASE WHEN TG_OP = 'DELETE' THEN OLD.value ELSE NULL END,
     CASE WHEN TG_OP = 'INSERT' THEN NEW.value WHEN TG_OP = 'UPDATE' THEN NEW.value ELSE NULL END,
-    auth.uid()
+    auth.uid()::UUID -- Explicit UUID casting
   );
   RETURN COALESCE(NEW, OLD);
 END;
