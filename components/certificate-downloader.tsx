@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Download, Shield, CheckCircle, AlertTriangle, Info } from "lucide-react"
 
 interface CertificateDownloaderProps {
@@ -20,17 +20,57 @@ const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({
   const [success, setSuccess] = useState(false)
   const [showInstructions, setShowInstructions] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState(0)
+  const [companyCnpj, setCompanyCnpj] = useState<string>("")
+
+  useEffect(() => {
+    const getCompanyCnpj = () => {
+      let cnpj = companyId
+
+      if (!cnpj) {
+        const storedCompany = localStorage.getItem("selectedCompany")
+        if (storedCompany) {
+          try {
+            const company = JSON.parse(storedCompany)
+            cnpj = company.cnpj || company.id || ""
+          } catch (e) {
+            console.warn("[v0] Erro ao parsear empresa do localStorage:", e)
+          }
+        }
+      }
+
+      if (!cnpj) {
+        const userData = localStorage.getItem("userData")
+        if (userData) {
+          try {
+            const user = JSON.parse(userData)
+            cnpj = user.cnpj || user.company_cnpj || ""
+          } catch (e) {
+            console.warn("[v0] Erro ao parsear dados do usuário:", e)
+          }
+        }
+      }
+
+      console.log("[v0] CNPJ da empresa obtido:", cnpj)
+      setCompanyCnpj(cnpj)
+    }
+
+    getCompanyCnpj()
+  }, [companyId])
 
   const handleDownload = async () => {
+    if (!companyCnpj) {
+      setError("CNPJ da empresa não encontrado. Verifique se a empresa está selecionada corretamente.")
+      return
+    }
+
     setLoading(true)
     setError(null)
     setSuccess(false)
     setDownloadProgress(0)
 
     try {
-      console.log("[v0] Iniciando download de certificado para empresa:", companyId)
+      console.log("[v0] Iniciando download de certificado para empresa:", companyCnpj)
 
-      // Passo 1: Obter token do backend
       setDownloadProgress(25)
       console.log("[v0] Solicitando token JWT...")
 
@@ -39,7 +79,10 @@ const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ company_id: companyId }),
+        body: JSON.stringify({
+          cnpj: companyCnpj,
+          company_id: companyCnpj,
+        }),
       })
 
       console.log("[v0] Resposta da API de token:", response.status, response.statusText)
@@ -55,7 +98,6 @@ const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({
 
       setDownloadProgress(50)
 
-      // Passo 2: Testar conectividade primeiro
       const testUrl = `https://216.22.5.44:5050/health`
       try {
         const healthCheck = await fetch(testUrl, {
@@ -68,15 +110,13 @@ const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({
         console.warn("[v0] Aviso: Servidor pode estar inacessível:", healthError)
       }
 
-      // Passo 3: Construir URL de download
-      const downloadUrl = `https://216.22.5.44:5050/download/${companyId}?token=${data.token}`
+      const downloadUrl = `https://216.22.5.44:5050/download/${companyCnpj}?token=${data.token}`
       console.log("[v0] URL de download:", downloadUrl.replace(data.token, "[TOKEN_HIDDEN]"))
 
       setDownloadProgress(60)
 
-      // Passo 4: Fazer download via fetch para controlar o processo
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 30000)
 
       console.log("[v0] Iniciando download do certificado...")
       const certResponse = await fetch(downloadUrl, {
@@ -98,7 +138,6 @@ const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({
 
       setDownloadProgress(75)
 
-      // Passo 5: Criar blob e iniciar download
       console.log("[v0] Processando arquivo de certificado...")
       const blob = await certResponse.blob()
       console.log("[v0] Tamanho do arquivo:", blob.size, "bytes, tipo:", blob.type)
@@ -110,7 +149,7 @@ const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement("a")
       link.href = url
-      link.download = `${companyName || companyId}-qztray-cert.p12`
+      link.download = `${companyName || companyCnpj}-qztray-cert.p12`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
@@ -121,9 +160,8 @@ const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({
       setShowInstructions(true)
       console.log("[v0] Download concluído com sucesso!")
 
-      // Callback opcional para notificar o componente pai
       if (onCertificateInstalled) {
-        onCertificateInstalled(companyId)
+        onCertificateInstalled(companyCnpj)
       }
     } catch (err: any) {
       console.error("[v0] Erro completo no download:", err)
@@ -148,26 +186,22 @@ const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({
     try {
       console.log("[v0] Testando conexão QZ Tray...")
 
-      // Test 1: Check if QZ Tray object exists
       if (!window.qz) {
         alert("❌ QZ Tray não foi detectado. Certifique-se de que está instalado e a página foi recarregada.")
         return
       }
 
-      // Test 2: Check websocket connection
       if (!window.qz.websocket) {
         alert("❌ WebSocket do QZ Tray não está disponível.")
         return
       }
 
-      // Test 3: Check if connected
       const isActive = window.qz.websocket.isActive()
       console.log("[v0] QZ Tray ativo:", isActive)
 
       if (isActive) {
         alert("✅ QZ Tray está conectado e funcionando!")
       } else {
-        // Try to connect
         try {
           await window.qz.websocket.connect()
           alert("✅ QZ Tray conectado com sucesso!")
@@ -190,23 +224,26 @@ const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({
       </div>
 
       <div className="space-y-4">
-        {/* Informações da empresa */}
         <div className="bg-gray-50 p-3 rounded-md">
           <p className="text-sm text-gray-600">
-            <strong>Empresa:</strong> {companyName || companyId}
+            <strong>Empresa:</strong> {companyName || companyCnpj || "Não identificada"}
           </p>
           <p className="text-sm text-gray-600">
-            <strong>ID:</strong> {companyId}
+            <strong>CNPJ:</strong> {companyCnpj || "Não encontrado"}
           </p>
+          {!companyCnpj && (
+            <p className="text-sm text-red-600 mt-2">⚠️ CNPJ não encontrado. Selecione uma empresa primeiro.</p>
+          )}
         </div>
 
-        {/* Botão de download */}
         <div className="flex gap-3">
           <button
             onClick={handleDownload}
-            disabled={loading}
+            disabled={loading || !companyCnpj}
             className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors ${
-              loading ? "bg-gray-400 cursor-not-allowed text-white" : "bg-blue-600 hover:bg-blue-700 text-white"
+              loading || !companyCnpj
+                ? "bg-gray-400 cursor-not-allowed text-white"
+                : "bg-blue-600 hover:bg-blue-700 text-white"
             }`}
           >
             <Download className="w-4 h-4" />
@@ -222,7 +259,6 @@ const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({
           </button>
         </div>
 
-        {/* Progress bar */}
         {loading && downloadProgress > 0 && (
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div
@@ -232,7 +268,6 @@ const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({
           </div>
         )}
 
-        {/* Mensagens de status */}
         {error && (
           <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-md">
             <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
@@ -253,7 +288,6 @@ const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({
           </div>
         )}
 
-        {/* Instruções de instalação */}
         {(showInstructions || success) && (
           <div className="border-t pt-4">
             <div className="flex items-center gap-2 mb-3">
@@ -309,7 +343,6 @@ const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({
           </div>
         )}
 
-        {/* Link para instruções detalhadas */}
         <div className="pt-2 border-t">
           <button
             onClick={() => setShowInstructions(!showInstructions)}
