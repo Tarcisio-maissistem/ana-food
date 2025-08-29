@@ -28,39 +28,85 @@ const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({
     setDownloadProgress(0)
 
     try {
+      console.log("[v0] Iniciando download de certificado para empresa:", companyId)
+
       // Passo 1: Obter token do backend
       setDownloadProgress(25)
+      console.log("[v0] Solicitando token JWT...")
+
       const response = await fetch("/api/generate-cert-token", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("authToken")}`, // Se usar auth
         },
         body: JSON.stringify({ company_id: companyId }),
       })
 
-      const data = await response.json()
+      console.log("[v0] Resposta da API de token:", response.status, response.statusText)
 
       if (!response.ok) {
-        throw new Error(data.error || "Falha ao gerar token de acesso")
+        const errorData = await response.text()
+        console.error("[v0] Erro na API de token:", errorData)
+        throw new Error(`Falha ao gerar token: ${response.status} - ${errorData}`)
       }
+
+      const data = await response.json()
+      console.log("[v0] Token JWT obtido com sucesso")
 
       setDownloadProgress(50)
 
-      // Passo 2: Construir URL de download
-      const downloadUrl = `https://216.22.5.44:5050/download/${companyId}?token=${data.token}`
+      // Passo 2: Testar conectividade primeiro
+      const testUrl = `https://216.22.5.44:5050/health`
+      try {
+        const healthCheck = await fetch(testUrl, {
+          method: "GET",
+          mode: "cors",
+          timeout: 5000,
+        })
+        console.log("[v0] Teste de conectividade:", healthCheck.status)
+      } catch (healthError) {
+        console.warn("[v0] Aviso: Servidor pode estar inacessível:", healthError)
+      }
 
-      // Passo 3: Fazer download via fetch para controlar o processo
-      const certResponse = await fetch(downloadUrl)
+      // Passo 3: Construir URL de download
+      const downloadUrl = `https://216.22.5.44:5050/download/${companyId}?token=${data.token}`
+      console.log("[v0] URL de download:", downloadUrl.replace(data.token, "[TOKEN_HIDDEN]"))
+
+      setDownloadProgress(60)
+
+      // Passo 4: Fazer download via fetch para controlar o processo
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+
+      console.log("[v0] Iniciando download do certificado...")
+      const certResponse = await fetch(downloadUrl, {
+        signal: controller.signal,
+        mode: "cors",
+        headers: {
+          Accept: "application/x-pkcs12,application/octet-stream,*/*",
+        },
+      })
+
+      clearTimeout(timeoutId)
+      console.log("[v0] Resposta do download:", certResponse.status, certResponse.headers.get("content-type"))
 
       if (!certResponse.ok) {
-        throw new Error("Falha ao baixar certificado do servidor")
+        const errorText = await certResponse.text()
+        console.error("[v0] Erro no download:", certResponse.status, errorText)
+        throw new Error(`Falha ao baixar certificado: ${certResponse.status} - ${errorText}`)
       }
 
       setDownloadProgress(75)
 
-      // Passo 4: Criar blob e iniciar download
+      // Passo 5: Criar blob e iniciar download
+      console.log("[v0] Processando arquivo de certificado...")
       const blob = await certResponse.blob()
+      console.log("[v0] Tamanho do arquivo:", blob.size, "bytes, tipo:", blob.type)
+
+      if (blob.size === 0) {
+        throw new Error("Arquivo de certificado está vazio")
+      }
+
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement("a")
       link.href = url
@@ -73,14 +119,25 @@ const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({
       setDownloadProgress(100)
       setSuccess(true)
       setShowInstructions(true)
+      console.log("[v0] Download concluído com sucesso!")
 
       // Callback opcional para notificar o componente pai
       if (onCertificateInstalled) {
         onCertificateInstalled(companyId)
       }
     } catch (err: any) {
-      setError(err.message)
-      console.error("Erro ao baixar certificado:", err)
+      console.error("[v0] Erro completo no download:", err)
+
+      let errorMessage = err.message
+      if (err.name === "AbortError") {
+        errorMessage = "Timeout: Download demorou mais que 30 segundos"
+      } else if (err.message.includes("Failed to fetch")) {
+        errorMessage = "Erro de conectividade: Verifique sua conexão com a internet e se o servidor está acessível"
+      } else if (err.message.includes("CORS")) {
+        errorMessage = "Erro de CORS: Problema de configuração do servidor"
+      }
+
+      setError(errorMessage)
     } finally {
       setLoading(false)
       setTimeout(() => setDownloadProgress(0), 2000)
@@ -89,18 +146,38 @@ const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({
 
   const handleTestConnection = async () => {
     try {
-      // Testar se o QZ Tray está rodando
-      if (window.qz && window.qz.websocket) {
-        const isActive = window.qz.websocket.isActive()
-        if (isActive) {
-          alert("✅ QZ Tray está conectado e funcionando!")
-        } else {
-          alert("⚠️ QZ Tray não está conectado. Verifique se está rodando.")
-        }
+      console.log("[v0] Testando conexão QZ Tray...")
+
+      // Test 1: Check if QZ Tray object exists
+      if (!window.qz) {
+        alert("❌ QZ Tray não foi detectado. Certifique-se de que está instalado e a página foi recarregada.")
+        return
+      }
+
+      // Test 2: Check websocket connection
+      if (!window.qz.websocket) {
+        alert("❌ WebSocket do QZ Tray não está disponível.")
+        return
+      }
+
+      // Test 3: Check if connected
+      const isActive = window.qz.websocket.isActive()
+      console.log("[v0] QZ Tray ativo:", isActive)
+
+      if (isActive) {
+        alert("✅ QZ Tray está conectado e funcionando!")
       } else {
-        alert("❌ QZ Tray não foi detectado. Certifique-se de que está instalado e rodando.")
+        // Try to connect
+        try {
+          await window.qz.websocket.connect()
+          alert("✅ QZ Tray conectado com sucesso!")
+        } catch (connectError) {
+          console.error("[v0] Erro ao conectar QZ Tray:", connectError)
+          alert("⚠️ QZ Tray detectado mas não conseguiu conectar. Verifique se está rodando corretamente.")
+        }
       }
     } catch (error: any) {
+      console.error("[v0] Erro no teste de conexão:", error)
       alert("❌ Erro ao testar conexão: " + error.message)
     }
   }
