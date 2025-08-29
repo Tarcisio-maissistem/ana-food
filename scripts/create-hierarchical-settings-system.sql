@@ -37,20 +37,22 @@ CREATE TABLE IF NOT EXISTS settings_catalog (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Removed foreign key references to settings_catalog to avoid type casting issues
 -- Configurações globais do sistema
 CREATE TABLE IF NOT EXISTS system_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  key VARCHAR(100) NOT NULL UNIQUE REFERENCES settings_catalog(key),
+  key VARCHAR(100) NOT NULL,
   value TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(key)
 );
 
 -- Configurações por empresa (overrides)
 CREATE TABLE IF NOT EXISTS company_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL REFERENCES empresas(id),
-  key VARCHAR(100) NOT NULL REFERENCES settings_catalog(key),
+  key VARCHAR(100) NOT NULL,
   value TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -61,7 +63,7 @@ CREATE TABLE IF NOT EXISTS company_settings (
 CREATE TABLE IF NOT EXISTS user_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id),
-  key VARCHAR(100) NOT NULL REFERENCES settings_catalog(key),
+  key VARCHAR(100) NOT NULL,
   value TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -114,7 +116,7 @@ ALTER TABLE company_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE printers ENABLE ROW LEVEL SECURITY;
 
--- Fixed RLS policies to use existing table structure without user_companies
+-- Simplified RLS policies to avoid type casting issues
 -- Políticas RLS simplificadas para usuários autenticados
 CREATE POLICY "Users can access company settings" ON company_settings
   FOR ALL USING (auth.uid() IS NOT NULL);
