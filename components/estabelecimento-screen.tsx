@@ -787,7 +787,7 @@ export function EstabelecimentoScreen() {
                         <Label htmlFor="nomeFantasia">Nome Fantasia *</Label>
                         <Input
                           id="nomeFantasia"
-                          value={formData.nomeFantasia}
+                          value={formData.nomeFantasia || ""}
                           onChange={(e) => setFormData((prev) => ({ ...prev, nomeFantasia: e.target.value }))}
                           placeholder="Nome do restaurante"
                         />
@@ -797,7 +797,7 @@ export function EstabelecimentoScreen() {
                         <Label htmlFor="razaoSocial">Razão Social</Label>
                         <Input
                           id="razaoSocial"
-                          value={formData.razaoSocial}
+                          value={formData.razaoSocial || ""}
                           onChange={(e) => setFormData((prev) => ({ ...prev, razaoSocial: e.target.value }))}
                           placeholder="Razão social da empresa"
                         />
@@ -1301,7 +1301,7 @@ export function EstabelecimentoScreen() {
                         <Label htmlFor="price">Valor da Entrega (R$)</Label>
                         <Input
                           id="price"
-                          value={bairroForm.price ? `R$ ${formatMoney(bairroForm.price)}` : ""}
+                          value={bairroForm.price ? `R$ ${formatMoney(bairroForm.price)}` : "R$ 0,00"}
                           onChange={(e) => {
                             const rawValue = parseMoney(e.target.value)
                             setBairroForm({ ...bairroForm, price: rawValue })

@@ -40,6 +40,8 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
 
   const loadPrinterSettings = async () => {
     try {
+      console.log("[v0] Carregando configurações de impressora...")
+
       const response = await fetch("/api/printer-settings", {
         headers: {
           "x-user-email": "tarcisiorp16@gmail.com",
@@ -48,25 +50,30 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
 
       if (response.ok) {
         const settings = await response.json()
+        console.log("[v0] Configurações carregadas:", settings)
+
         if (settings.defaultPrinter) {
           setSelectedPrinter(settings.defaultPrinter)
           qzTrayService.setSelectedPrinter(settings.defaultPrinter)
+          console.log("[v0] Impressora padrão definida:", settings.defaultPrinter)
         }
         setPrintSettings({
-          showLogo: settings.showLogo,
-          showTitle: settings.showTitle,
-          showAddress: settings.showAddress,
-          showPhone: settings.showPhone,
+          showLogo: settings.showLogo !== undefined ? settings.showLogo : true,
+          showTitle: settings.showTitle !== undefined ? settings.showTitle : true,
+          showAddress: settings.showAddress !== undefined ? settings.showAddress : true,
+          showPhone: settings.showPhone !== undefined ? settings.showPhone : true,
         })
         qzTrayService.updatePrintSettings({
-          showLogo: settings.showLogo,
-          showTitle: settings.showTitle,
-          showAddress: settings.showAddress,
-          showPhone: settings.showPhone,
+          showLogo: settings.showLogo !== undefined ? settings.showLogo : true,
+          showTitle: settings.showTitle !== undefined ? settings.showTitle : true,
+          showAddress: settings.showAddress !== undefined ? settings.showAddress : true,
+          showPhone: settings.showPhone !== undefined ? settings.showPhone : true,
         })
+      } else {
+        console.error("[v0] Erro ao carregar configurações:", response.status)
       }
     } catch (error) {
-      console.error("Erro ao carregar configurações de impressora:", error)
+      console.error("[v0] Erro ao carregar configurações de impressora:", error)
     }
   }
 
@@ -178,6 +185,11 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
   const savePrinterSettings = async () => {
     setSavingSettings(true)
     try {
+      console.log("[v0] Salvando configurações de impressora:", {
+        defaultPrinter: selectedPrinter,
+        ...printSettings,
+      })
+
       const response = await fetch("/api/printer-settings", {
         method: "POST",
         headers: {
@@ -190,13 +202,19 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
         }),
       })
 
+      const result = await response.json()
+      console.log("[v0] Resposta da API:", result)
+
       if (response.ok) {
+        console.log("[v0] Configurações salvas com sucesso!")
         alert("Configurações salvas com sucesso!")
+        await loadPrinterSettings()
       } else {
-        throw new Error("Erro ao salvar configurações")
+        console.error("[v0] Erro na resposta da API:", result)
+        throw new Error(result.error || "Erro ao salvar configurações")
       }
     } catch (error) {
-      console.error("Erro ao salvar configurações:", error)
+      console.error("[v0] Erro ao salvar configurações:", error)
       alert("Erro ao salvar configurações: " + error.message)
     } finally {
       setSavingSettings(false)
