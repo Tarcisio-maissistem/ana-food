@@ -8,7 +8,8 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Printer, TestTube, RefreshCw, Wifi, WifiOff, Settings } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { Printer, TestTube, RefreshCw, Wifi, WifiOff, Settings, Eye } from "lucide-react"
 import qzTrayService from "@/lib/qz-tray-service"
 import PrinterLayoutEditor from "@/components/printer-layout-editor"
 
@@ -30,6 +31,7 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
 
   const [savingSettings, setSavingSettings] = useState(false)
   const [printerLayout, setPrinterLayout] = useState(null)
+  const [showPreview, setShowPreview] = useState(false)
 
   useEffect(() => {
     loadPrinterSettings()
@@ -170,54 +172,7 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
   }
 
   const generatePreview = () => {
-    let preview = ""
-
-    if (printSettings.showLogo) {
-      preview += "🍔 LOGO DA EMPRESA\n"
-    }
-
-    if (printSettings.showTitle) {
-      preview += `${companyData?.nome || "RESTAURANTE EXEMPLO"}\n`
-    }
-
-    if (printSettings.showAddress) {
-      preview += `${companyData?.rua || "Rua Exemplo, 123"}\n`
-    }
-
-    if (printSettings.showPhone) {
-      preview += `Tel: ${companyData?.telefone || "(11) 99999-9999"}\n`
-    }
-
-    preview += "\n" + "=".repeat(32) + "\n"
-    preview += `PEDIDO: ${sampleOrder.id}\n`
-    preview += `CLIENTE: ${sampleOrder.customerName}\n`
-    preview += `TELEFONE: ${sampleOrder.customerPhone}\n`
-    preview += `ENDEREÇO: ${sampleOrder.customerAddress}\n`
-    preview += "=".repeat(32) + "\n\n"
-
-    sampleOrder.items.forEach((item) => {
-      preview += `${item.quantity}x ${item.name}\n`
-      preview += `   R$ ${item.price.toFixed(2)}\n`
-      if (item.observations) {
-        preview += `   OBS: ${item.observations}\n`
-      }
-      preview += "\n"
-    })
-
-    preview += "-".repeat(32) + "\n"
-    preview += `SUBTOTAL: R$ ${sampleOrder.subtotal.toFixed(2)}\n`
-    preview += `ENTREGA: R$ ${sampleOrder.deliveryFee.toFixed(2)}\n`
-    preview += `TOTAL: R$ ${sampleOrder.total.toFixed(2)}\n`
-    preview += "-".repeat(32) + "\n"
-    preview += `PAGAMENTO: ${sampleOrder.paymentMethod}\n`
-    if (sampleOrder.change) {
-      preview += `TROCO PARA: R$ ${sampleOrder.change.toFixed(2)}\n`
-    }
-    if (sampleOrder.observations) {
-      preview += `\nOBSERVAÇÕES: ${sampleOrder.observations}\n`
-    }
-
-    return preview
+    return qzTrayService.generatePreviewContent(sampleOrder, companyData)
   }
 
   const savePrinterSettings = async () => {
@@ -250,7 +205,6 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
 
   const handleLayoutChange = (layout) => {
     setPrinterLayout(layout)
-    // Update QZ Tray service with new layout
     qzTrayService.updatePrintLayout(layout)
   }
 
@@ -274,20 +228,33 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
 
   const [sampleOrder, setSampleOrder] = useState({
     id: "PED-001",
+    order_number: "PED-001",
     customerName: "João Silva",
+    customer_name: "João Silva",
     customerPhone: "(11) 99999-9999",
+    phone: "(11) 99999-9999",
     customerAddress: "Rua das Flores, 123 - Centro",
+    address: "Rua das Flores, 123 - Centro",
+    customerNeighborhood: "Centro",
+    neighborhood: "Centro",
+    customerReference: "Portão azul",
+    reference: "Portão azul",
     items: [
-      { name: "X-Burger", quantity: 2, price: 15.9, observations: "Sem cebola" },
-      { name: "Batata Frita", quantity: 1, price: 8.5, observations: "" },
+      { name: "X-Burger Especial", quantity: 2, price: 15.9, observations: "Sem cebola, extra bacon" },
+      { name: "Batata Frita Grande", quantity: 1, price: 8.5, observations: "Bem crocante" },
       { name: "Coca-Cola 350ml", quantity: 2, price: 4.5, observations: "" },
+      { name: "Sorvete de Chocolate", quantity: 1, price: 6.0, observations: "Com cobertura" },
     ],
-    subtotal: 48.8,
+    subtotal: 55.3,
     deliveryFee: 5.0,
-    total: 53.8,
+    discount: 2.0,
+    total: 58.3,
     paymentMethod: "Dinheiro",
-    change: 60.0,
-    observations: "Entregar no portão azul",
+    payment_method: "Dinheiro",
+    changeFor: 70.0,
+    deliveryType: "Entrega",
+    estimatedTime: "45-60 minutos",
+    observations: "Entregar no portão azul, tocar campainha duas vezes. Cliente aguarda no térreo.",
   })
 
   return (
@@ -399,8 +366,9 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="simple" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="simple">Configuração Simples</TabsTrigger>
+              <TabsTrigger value="preview">Pré-visualização</TabsTrigger>
               <TabsTrigger value="advanced">Editor de Layout</TabsTrigger>
             </TabsList>
 
@@ -451,6 +419,48 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
                 {loading ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <TestTube className="h-4 w-4 mr-2" />}
                 Teste de Impressão Simples
               </Button>
+            </TabsContent>
+
+            <TabsContent value="preview" className="space-y-4">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-medium">Pré-visualização do Pedido</h3>
+                  <Button onClick={() => setShowPreview(!showPreview)} variant="outline" size="sm">
+                    <Eye className="h-4 w-4 mr-2" />
+                    {showPreview ? "Ocultar" : "Mostrar"} Preview
+                  </Button>
+                </div>
+
+                {showPreview && (
+                  <div className="border rounded-lg p-4 bg-gray-50">
+                    <Textarea
+                      value={generatePreview()}
+                      readOnly
+                      className="font-mono text-xs min-h-[400px] bg-white"
+                      placeholder="Preview do pedido aparecerá aqui..."
+                    />
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <Button onClick={() => setShowPreview(true)} variant="outline" className="flex-1">
+                    <Eye className="h-4 w-4 mr-2" />
+                    Visualizar Pedido
+                  </Button>
+                  <Button
+                    onClick={handleTestPrint}
+                    disabled={loading || !isConnected || !selectedPrinter}
+                    className="flex-1"
+                  >
+                    {loading ? (
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <TestTube className="h-4 w-4 mr-2" />
+                    )}
+                    Imprimir Teste
+                  </Button>
+                </div>
+              </div>
             </TabsContent>
 
             <TabsContent value="advanced">
