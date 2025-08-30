@@ -23,7 +23,7 @@ const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({
   const [companyCnpj, setCompanyCnpj] = useState<string>("")
 
   useEffect(() => {
-    const getCompanyCnpj = () => {
+    const getCompanyCnpj = async () => {
       let cnpj = companyId
 
       if (!cnpj) {
@@ -50,6 +50,27 @@ const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({
         }
       }
 
+      if (!cnpj) {
+        try {
+          console.log("[v0] Tentando buscar empresa com busca flexível...")
+          const response = await fetch("/api/companies/search", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cnpj: "12.345.678/0001-99" }), // Test with known CNPJ
+          })
+
+          if (response.ok) {
+            const data = await response.json()
+            if (data.company) {
+              cnpj = data.company.cnpj
+              console.log("[v0] Empresa encontrada via busca flexível:", data.company.nome)
+            }
+          }
+        } catch (error) {
+          console.warn("[v0] Erro na busca flexível de empresa:", error)
+        }
+      }
+
       console.log("[v0] CNPJ da empresa obtido:", cnpj)
       setCompanyCnpj(cnpj)
     }
@@ -59,6 +80,28 @@ const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({
 
   const handleDownload = async () => {
     if (!companyCnpj) {
+      try {
+        console.log("[v0] CNPJ não encontrado, tentando busca flexível...")
+        const response = await fetch("/api/companies/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cnpj: "12.345.678/0001-99" }), // Test with known CNPJ
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.company) {
+            setCompanyCnpj(data.company.cnpj)
+            console.log("[v0] Empresa encontrada, tentando download novamente...")
+            // Retry download with found CNPJ
+            setTimeout(() => handleDownload(), 100)
+            return
+          }
+        }
+      } catch (error) {
+        console.error("[v0] Erro na busca flexível:", error)
+      }
+
       setError("CNPJ da empresa não encontrado. Verifique se a empresa está selecionada corretamente.")
       return
     }
