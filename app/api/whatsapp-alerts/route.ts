@@ -5,10 +5,26 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env
 
 async function getUserByEmail(email: string) {
   try {
-    const { data: user, error } = await supabase.from("users").select("id").eq("email", email).maybeSingle()
+    console.log("[v0] WhatsApp Alerts: Iniciando busca por usuário com email:", email)
+
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error("[v0] WhatsApp Alerts: Variáveis de ambiente do Supabase não configuradas")
+      throw new Error("Supabase environment variables not configured")
+    }
+
+    console.log("[v0] WhatsApp Alerts: Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL)
+    console.log("[v0] WhatsApp Alerts: Service role key exists:", !!process.env.SUPABASE_SERVICE_ROLE_KEY)
+
+    const queryPromise = supabase.from("users").select("id").eq("email", email).maybeSingle()
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Database query timeout")), 10000),
+    )
+
+    const { data: user, error } = (await Promise.race([queryPromise, timeoutPromise])) as any
 
     if (error) {
       console.error("[v0] WhatsApp Alerts: Erro ao buscar usuário:", error.message)
+      console.error("[v0] WhatsApp Alerts: Detalhes do erro:", error)
       return null
     }
 
@@ -21,6 +37,15 @@ async function getUserByEmail(email: string) {
     return user.id
   } catch (error) {
     console.error("[v0] WhatsApp Alerts: Erro crítico ao buscar usuário:", error)
+
+    if (error instanceof Error) {
+      if (error.message.includes("fetch failed")) {
+        console.error("[v0] WhatsApp Alerts: Erro de conectividade com Supabase")
+      } else if (error.message.includes("timeout")) {
+        console.error("[v0] WhatsApp Alerts: Timeout na consulta ao banco de dados")
+      }
+    }
+
     return null
   }
 }
