@@ -19,13 +19,16 @@ const CertificateInstaller = () => {
     try {
       console.log("[v0] Iniciando download do certificado compartilhado...")
 
-      // URL do certificado .p12 compartilhado no Google Drive
-      const certUrl =
-        "https://drive.usercontent.google.com/download?id=1OOb9Hojrnpc0lWQtHNKizbQ-1_1xJIY2&export=download&authuser=0&confirm=t&uuid=6d6d36b5-01be-4b99-a9e8-e6a577a9b565&at=AN8xHopzBVySvQPs2-LGoBEgaU0D:1756612232082"
+      const response = await fetch("/api/qz/certificate", {
+        method: "GET",
+        headers: {
+          Accept: "application/octet-stream",
+          "Cache-Control": "no-cache",
+        },
+      })
 
-      const response = await fetch(certUrl)
       if (!response.ok) {
-        throw new Error(`Erro ao baixar certificado: ${response.status}`)
+        throw new Error(`Erro ao baixar certificado: ${response.status} - ${response.statusText}`)
       }
 
       const blob = await response.blob()
