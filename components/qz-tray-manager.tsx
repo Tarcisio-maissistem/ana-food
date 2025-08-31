@@ -9,10 +9,10 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { Printer, TestTube, RefreshCw, Wifi, WifiOff, Settings, Eye } from "lucide-react"
+import { Printer, TestTube, RefreshCw, Wifi, WifiOff, Settings, Eye, CheckCircle } from "lucide-react"
 import qzTrayService from "@/lib/qz-tray-service"
 import PrinterLayoutEditor from "@/components/printer-layout-editor"
-import CertificateDownloader from "@/components/certificate-downloader"
+import CertificateInstaller from "@/components/certificate-installer"
 
 interface QZTrayManagerProps {
   companyData?: any
@@ -34,12 +34,35 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
   const [savingSettings, setSavingSettings] = useState(false)
   const [printerLayout, setPrinterLayout] = useState(null)
   const [showPreview, setShowPreview] = useState(false)
+  const [connectionStatus, setConnectionStatus] = useState<string>("Inicializando...")
 
   useEffect(() => {
     loadPrinterSettings()
-    checkConnection()
     loadCompanyData()
+    monitorConnection()
   }, [])
+
+  const monitorConnection = () => {
+    const checkStatus = () => {
+      const connected = qzTrayService.isQzTrayConnected()
+      setIsConnected(connected)
+
+      if (connected) {
+        setConnectionStatus("Conectado automaticamente")
+        if (printers.length === 0) {
+          loadPrinters()
+        }
+      } else {
+        setConnectionStatus("Tentando conectar automaticamente...")
+      }
+    }
+
+    checkStatus()
+
+    const interval = setInterval(checkStatus, 5000)
+
+    return () => clearInterval(interval)
+  }
 
   const loadPrinterSettings = async () => {
     try {
@@ -73,27 +96,26 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
     }
   }
 
-  const checkConnection = async () => {
+  const refreshConnection = async () => {
+    setLoading(true)
     try {
-      console.log("[v0] Verificando conexão QZ Tray...")
-
+      console.log("[v0] Forçando reconexão QZ Tray...")
       const connected = await qzTrayService.connect()
-      console.log("[v0] Resultado da conexão:", connected)
 
       if (connected === true || (connected && connected.success === true)) {
         setIsConnected(true)
-        console.log("[v0] Conexão estabelecida, carregando impressoras...")
+        setConnectionStatus("Reconectado com sucesso")
         await loadPrinters()
-      } else if (connected && connected.success === false) {
-        setIsConnected(false)
-        console.error("[v0] Falha ao conectar com QZ Tray:", connected.error || "Conexão falhou")
       } else {
         setIsConnected(false)
-        console.error("[v0] Formato de resposta inesperado:", connected)
+        setConnectionStatus("Falha na reconexão")
       }
     } catch (error) {
-      console.error("[v0] Erro ao verificar conexão QZ Tray:", error)
+      console.error("[v0] Erro ao reconectar QZ Tray:", error)
       setIsConnected(false)
+      setConnectionStatus("Erro na conexão")
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -293,40 +315,46 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            {isConnected ? <Wifi className="h-5 w-5 text-green-500" /> : <WifiOff className="h-5 w-5 text-red-500" />}
-            Status da Conexão QZ Tray
+            {isConnected ? (
+              <Wifi className="h-5 w-5 text-green-500" />
+            ) : (
+              <WifiOff className="h-5 w-5 text-orange-500" />
+            )}
+            Status da Conexão QZ Tray (Automática)
           </CardTitle>
           <CardDescription>
             {isConnected
-              ? "Conectado e pronto para imprimir"
-              : "QZ Tray não está rodando. Instale e execute o QZ Tray para detectar impressoras do Windows."}
+              ? "Conectado automaticamente com certificado compartilhado"
+              : "Sistema tentando conectar automaticamente. Certifique-se de que o QZ Tray está rodando."}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-4">
-            <Badge variant={isConnected ? "default" : "destructive"}>
-              {isConnected ? "Conectado" : "QZ Tray Não Disponível"}
+            <Badge variant={isConnected ? "default" : "secondary"}>
+              {isConnected ? (
+                <div className="flex items-center gap-1">
+                  <CheckCircle className="h-3 w-3" />
+                  Conectado Automaticamente
+                </div>
+              ) : (
+                connectionStatus
+              )}
             </Badge>
-            <Button onClick={checkConnection} disabled={loading} variant="outline" size="sm">
+            <Button onClick={refreshConnection} disabled={loading} variant="outline" size="sm">
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-              {isConnected ? "Reconectar" : "Tentar Conectar"}
+              Atualizar Status
             </Button>
           </div>
 
           {!isConnected && (
-            <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-              <h4 className="font-medium text-orange-800 mb-2">Como instalar o QZ Tray:</h4>
-              <ol className="text-sm text-orange-700 space-y-1">
-                <li>
-                  1. Baixe o QZ Tray em:{" "}
-                  <a href="https://qz.io/download/" target="_blank" rel="noopener noreferrer" className="underline">
-                    https://qz.io/download/
-                  </a>
-                </li>
-                <li>2. Instale o aplicativo no seu computador</li>
-                <li>3. Execute o QZ Tray (deve aparecer na bandeja do sistema)</li>
-                <li>4. Certifique-se de que está rodando na porta 8182</li>
-                <li>5. Recarregue esta página para tentar conectar novamente</li>
+            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h4 className="font-medium text-blue-800 mb-2">Sistema de Certificado Compartilhado:</h4>
+              <ol className="text-sm text-blue-700 space-y-1">
+                <li>1. O QZ Tray agora usa um certificado compartilhado entre todos os clientes</li>
+                <li>2. Não é necessário configurar certificados individuais</li>
+                <li>3. A conexão é estabelecida automaticamente quando o QZ Tray está rodando</li>
+                <li>4. Use a aba "Certificados" abaixo para instalar o certificado compartilhado</li>
+                <li>5. Após instalar o certificado, reinicie o QZ Tray</li>
               </ol>
             </div>
           )}
@@ -400,7 +428,7 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
               <TabsTrigger value="simple">Configuração Simples</TabsTrigger>
               <TabsTrigger value="preview">Pré-visualização</TabsTrigger>
               <TabsTrigger value="advanced">Editor de Layout</TabsTrigger>
-              <TabsTrigger value="certificates">Certificados</TabsTrigger>
+              <TabsTrigger value="certificates">Certificado Compartilhado</TabsTrigger>
             </TabsList>
 
             <TabsContent value="simple" className="space-y-4">
@@ -500,29 +528,26 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
 
             <TabsContent value="certificates" className="space-y-4">
               <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <h4 className="font-medium text-blue-800 mb-2">Informações da Empresa:</h4>
-                <p className="text-sm text-blue-700">
-                  <strong>Empresa:</strong>{" "}
-                  {currentCompanyData?.name || currentCompanyData?.razao_social || "Não identificada"}
+                <h4 className="font-medium text-blue-800 mb-2">Sistema de Certificado Compartilhado:</h4>
+                <p className="text-sm text-blue-700 mb-2">
+                  Agora utilizamos um único certificado compartilhado entre todos os clientes, eliminando a necessidade
+                  de configurações individuais.
                 </p>
                 <p className="text-sm text-blue-700">
-                  <strong>CNPJ:</strong> {currentCompanyData?.cnpj || "Não encontrado"}
+                  <strong>Status:</strong> {isConnected ? "✅ Certificado ativo" : "⏳ Aguardando instalação"}
                 </p>
-                {(!currentCompanyData || !currentCompanyData.cnpj) && (
-                  <p className="text-sm text-orange-600 mt-2">⚠️ CNPJ não encontrado. Selecione uma empresa primeiro.</p>
-                )}
               </div>
 
-              <CertificateDownloader
-                companyId={currentCompanyData?.cnpj || ""}
-                companyName={currentCompanyData?.name || currentCompanyData?.razao_social || ""}
-                onCertificateInstalled={(companyId) => {
-                  console.log("[v0] Certificado instalado para empresa:", companyId)
-                  setTimeout(() => {
-                    checkConnection()
-                  }, 2000)
-                }}
-              />
+              <CertificateInstaller />
+
+              {isConnected && (
+                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-sm text-green-700">
+                    ✅ <strong>Certificado compartilhado ativo!</strong> O sistema está pronto para imprimir
+                    automaticamente.
+                  </p>
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </CardContent>
