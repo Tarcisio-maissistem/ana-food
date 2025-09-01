@@ -7,12 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { Printer, TestTube, RefreshCw, Wifi, WifiOff, Settings, Eye, CheckCircle } from "lucide-react"
+import { Printer, TestTube, RefreshCw, Wifi, WifiOff, Eye, CheckCircle } from "lucide-react"
 import qzTrayService from "@/lib/qz-tray-service"
-import PrinterLayoutEditor from "@/components/printer-layout-editor"
-import CertificateInstaller from "@/components/certificate-installer"
 
 interface QZTrayManagerProps {
   companyData?: any
@@ -320,11 +317,11 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
             ) : (
               <WifiOff className="h-5 w-5 text-orange-500" />
             )}
-            Status da Conexão QZ Tray (Automática)
+            Status da Conexão QZ Tray
           </CardTitle>
           <CardDescription>
             {isConnected
-              ? "Conectado automaticamente com certificado compartilhado"
+              ? "Conectado automaticamente em modo silencioso"
               : "Sistema tentando conectar automaticamente. Certifique-se de que o QZ Tray está rodando."}
           </CardDescription>
         </CardHeader>
@@ -334,7 +331,7 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
               {isConnected ? (
                 <div className="flex items-center gap-1">
                   <CheckCircle className="h-3 w-3" />
-                  Conectado Automaticamente
+                  Conectado (Modo Silencioso)
                 </div>
               ) : (
                 connectionStatus
@@ -348,13 +345,12 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
 
           {!isConnected && (
             <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h4 className="font-medium text-blue-800 mb-2">Sistema de Certificado Compartilhado:</h4>
+              <h4 className="font-medium text-blue-800 mb-2">Modo Silencioso Ativado:</h4>
               <ol className="text-sm text-blue-700 space-y-1">
-                <li>1. O QZ Tray agora usa um certificado compartilhado entre todos os clientes</li>
-                <li>2. Não é necessário configurar certificados individuais</li>
-                <li>3. A conexão é estabelecida automaticamente quando o QZ Tray está rodando</li>
-                <li>4. Use a aba "Certificados" abaixo para instalar o certificado compartilhado</li>
-                <li>5. Após instalar o certificado, reinicie o QZ Tray</li>
+                <li>1. O QZ Tray opera sem validação de certificados</li>
+                <li>2. Não há popups de autorização ou confirmação</li>
+                <li>3. A impressão acontece diretamente ao clicar no botão</li>
+                <li>4. Certifique-se de que o QZ Tray está rodando no Windows</li>
               </ol>
             </div>
           )}
@@ -366,190 +362,140 @@ export default function QZTrayManager({ companyData }: QZTrayManagerProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Printer className="h-5 w-5" />
-            Seleção de Impressora
+            Configuração de Impressora
           </CardTitle>
-          <CardDescription>
-            Escolha a impressora para imprimir os pedidos ({printers.length} encontradas)
-          </CardDescription>
+          <CardDescription>Selecione a impressora e configure as opções de impressão em uma única tela</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-4">
-            <Select value={selectedPrinter} onValueChange={handlePrinterSelect}>
-              <SelectTrigger className="flex-1">
-                <SelectValue placeholder="Selecione uma impressora" />
-              </SelectTrigger>
-              <SelectContent>
-                {printers.map((printer) => (
-                  <SelectItem key={printer} value={printer}>
-                    {printer}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button onClick={loadPrinters} disabled={loading || !isConnected} variant="outline" size="sm">
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-              Atualizar
-            </Button>
+        <CardContent className="space-y-6">
+          {/* Printer Selection */}
+          <div className="space-y-4">
+            <Label className="text-base font-medium">Impressora Padrão</Label>
+            <div className="flex items-center gap-4">
+              <Select value={selectedPrinter} onValueChange={handlePrinterSelect}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Selecione uma impressora" />
+                </SelectTrigger>
+                <SelectContent>
+                  {printers.length > 0 ? (
+                    printers.map((printer) => (
+                      <SelectItem key={printer} value={printer}>
+                        {printer}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="none" disabled>
+                      Nenhuma impressora encontrada
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              <Button onClick={loadPrinters} disabled={loading || !isConnected} variant="outline" size="sm">
+                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+                Atualizar
+              </Button>
+            </div>
+
+            {selectedPrinter && (
+              <div className="p-3 bg-green-50 rounded-lg">
+                <p className="text-sm text-green-700">
+                  Impressora selecionada: <strong>{selectedPrinter}</strong>
+                </p>
+              </div>
+            )}
+
+            {printers.length === 0 && isConnected && (
+              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-700">
+                  ⚠️ Nenhuma impressora encontrada. Verifique se há impressoras instaladas no Windows.
+                </p>
+              </div>
+            )}
           </div>
 
-          {selectedPrinter && (
-            <div className="p-3 bg-green-50 rounded-lg">
-              <p className="text-sm text-green-700">
-                Impressora selecionada: <strong>{selectedPrinter}</strong>
-              </p>
-            </div>
-          )}
+          {/* Print Settings */}
+          <div className="space-y-4">
+            <Label className="text-base font-medium">Configurações de Impressão</Label>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="show-logo"
+                  checked={printSettings.showLogo}
+                  onCheckedChange={(checked) => handleSettingChange("showLogo", checked)}
+                />
+                <Label htmlFor="show-logo">Mostrar Logo</Label>
+              </div>
 
-          <div className="flex justify-end">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="show-title"
+                  checked={printSettings.showTitle}
+                  onCheckedChange={(checked) => handleSettingChange("showTitle", checked)}
+                />
+                <Label htmlFor="show-title">Mostrar Título</Label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="show-address"
+                  checked={printSettings.showAddress}
+                  onCheckedChange={(checked) => handleSettingChange("showAddress", checked)}
+                />
+                <Label htmlFor="show-address">Mostrar Endereço</Label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="show-phone"
+                  checked={printSettings.showPhone}
+                  onCheckedChange={(checked) => handleSettingChange("showPhone", checked)}
+                />
+                <Label htmlFor="show-phone">Mostrar Telefone</Label>
+              </div>
+            </div>
+          </div>
+
+          {/* Preview Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-base font-medium">Pré-visualização do Pedido</Label>
+              <Button onClick={() => setShowPreview(!showPreview)} variant="outline" size="sm">
+                <Eye className="h-4 w-4 mr-2" />
+                {showPreview ? "Ocultar" : "Mostrar"} Preview
+              </Button>
+            </div>
+
+            {showPreview && (
+              <div className="border rounded-lg p-4 bg-gray-50">
+                <Textarea
+                  value={generatePreview()}
+                  readOnly
+                  className="font-mono text-xs min-h-[300px] bg-white"
+                  placeholder="Preview do pedido aparecerá aqui..."
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-4 pt-4 border-t">
             <Button
               onClick={savePrinterSettings}
               disabled={savingSettings || !selectedPrinter}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="flex-1 bg-blue-600 hover:bg-blue-700"
             >
               {savingSettings ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : null}
               Salvar Configurações
             </Button>
+            <Button
+              onClick={handleTestPrint}
+              disabled={loading || !isConnected || !selectedPrinter}
+              variant="outline"
+              className="flex-1 bg-transparent"
+            >
+              {loading ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <TestTube className="h-4 w-4 mr-2" />}
+              Teste de Impressão
+            </Button>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Print Settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="h-5 w-5" />
-            Configurações de Impressão
-          </CardTitle>
-          <CardDescription>Configure o layout e aparência dos cupons impressos</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="simple" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="simple">Configuração Simples</TabsTrigger>
-              <TabsTrigger value="preview">Pré-visualização</TabsTrigger>
-              <TabsTrigger value="advanced">Editor de Layout</TabsTrigger>
-              <TabsTrigger value="certificates">Certificado Compartilhado</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="simple" className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="show-logo"
-                    checked={printSettings.showLogo}
-                    onCheckedChange={(checked) => handleSettingChange("showLogo", checked)}
-                  />
-                  <Label htmlFor="show-logo">Mostrar Logo</Label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="show-title"
-                    checked={printSettings.showTitle}
-                    onCheckedChange={(checked) => handleSettingChange("showTitle", checked)}
-                  />
-                  <Label htmlFor="show-title">Mostrar Título</Label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="show-address"
-                    checked={printSettings.showAddress}
-                    onCheckedChange={(checked) => handleSettingChange("showAddress", checked)}
-                  />
-                  <Label htmlFor="show-address">Mostrar Endereço</Label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="show-phone"
-                    checked={printSettings.showPhone}
-                    onCheckedChange={(checked) => handleSettingChange("showPhone", checked)}
-                  />
-                  <Label htmlFor="show-phone">Mostrar Telefone</Label>
-                </div>
-              </div>
-
-              <Button
-                onClick={handleTestPrint}
-                disabled={loading || !isConnected || !selectedPrinter}
-                className="w-full"
-              >
-                {loading ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <TestTube className="h-4 w-4 mr-2" />}
-                Teste de Impressão Simples
-              </Button>
-            </TabsContent>
-
-            <TabsContent value="preview" className="space-y-4">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-medium">Pré-visualização do Pedido</h3>
-                  <Button onClick={() => setShowPreview(!showPreview)} variant="outline" size="sm">
-                    <Eye className="h-4 w-4 mr-2" />
-                    {showPreview ? "Ocultar" : "Mostrar"} Preview
-                  </Button>
-                </div>
-
-                {showPreview && (
-                  <div className="border rounded-lg p-4 bg-gray-50">
-                    <Textarea
-                      value={generatePreview()}
-                      readOnly
-                      className="font-mono text-xs min-h-[400px] bg-white"
-                      placeholder="Preview do pedido aparecerá aqui..."
-                    />
-                  </div>
-                )}
-
-                <div className="flex gap-2">
-                  <Button onClick={() => setShowPreview(true)} variant="outline" className="flex-1">
-                    <Eye className="h-4 w-4 mr-2" />
-                    Visualizar Pedido
-                  </Button>
-                  <Button
-                    onClick={handleTestPrint}
-                    disabled={loading || !isConnected || !selectedPrinter}
-                    className="flex-1"
-                  >
-                    {loading ? (
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <TestTube className="h-4 w-4 mr-2" />
-                    )}
-                    Imprimir Teste
-                  </Button>
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="advanced">
-              <PrinterLayoutEditor onLayoutChange={handleLayoutChange} onTestPrint={handleLayoutTestPrint} />
-            </TabsContent>
-
-            <TabsContent value="certificates" className="space-y-4">
-              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <h4 className="font-medium text-blue-800 mb-2">Sistema de Certificado Compartilhado:</h4>
-                <p className="text-sm text-blue-700 mb-2">
-                  Agora utilizamos um único certificado compartilhado entre todos os clientes, eliminando a necessidade
-                  de configurações individuais.
-                </p>
-                <p className="text-sm text-blue-700">
-                  <strong>Status:</strong> {isConnected ? "✅ Certificado ativo" : "⏳ Aguardando instalação"}
-                </p>
-              </div>
-
-              <CertificateInstaller />
-
-              {isConnected && (
-                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <p className="text-sm text-green-700">
-                    ✅ <strong>Certificado compartilhado ativo!</strong> O sistema está pronto para imprimir
-                    automaticamente.
-                  </p>
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
         </CardContent>
       </Card>
     </div>
