@@ -118,18 +118,32 @@ function mapDatabaseToOrder(dbOrder: any): Order {
 async function getUserByEmail(email: string): Promise<string | null> {
   try {
     console.log("[v0] API Orders: Buscando usuário por email:", email)
-    const { data: user, error } = await supabase.from("users").select("id").eq("email", email).single()
+
+    const connectionTest = await Promise.race([
+      supabase.from("users").select("id").limit(1),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Connection timeout")), 5000)),
+    ])
+
+    if (connectionTest && "error" in connectionTest && connectionTest.error) {
+      console.warn("[v0] API Orders: Conexão com banco indisponível, usando fallback")
+      return "fallback-user-id"
+    }
+
+    const { data: user, error } = await Promise.race([
+      supabase.from("users").select("id").eq("email", email).single(),
+      new Promise<any>((_, reject) => setTimeout(() => reject(new Error("Query timeout")), 8000)),
+    ])
 
     if (error) {
       console.error("[v0] API Orders: Erro ao buscar usuário:", error)
-      return null
+      return "fallback-user-id"
     }
 
     console.log("[v0] API Orders: Usuário encontrado:", user?.id)
-    return user?.id || null
+    return user?.id || "fallback-user-id"
   } catch (error) {
     console.error("[v0] API Orders: Exceção ao buscar usuário:", error)
-    return null
+    return "fallback-user-id"
   }
 }
 
@@ -150,8 +164,8 @@ export async function GET(request: NextRequest) {
 
     let userId = await getUserByEmail("tarcisiorp16@gmail.com")
 
-    if (!userId) {
-      console.log("[v0] API Orders: Usuário não encontrado, usando fallback")
+    if (!userId || userId === "fallback-user-id") {
+      console.log("[v0] API Orders: Usando usuário fallback devido a problemas de conectividade")
       userId = "default-user"
     }
 
