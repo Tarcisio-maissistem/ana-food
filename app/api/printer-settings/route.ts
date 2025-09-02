@@ -29,30 +29,17 @@ async function checkSupabaseHealth() {
   }
 }
 
-async function getUserByEmail(email: string) {
-  try {
-    const isHealthy = await checkSupabaseHealth()
-    if (!isHealthy) {
-      console.warn("[v0] Supabase unhealthy, using fallback user")
-      return { id: "fallback-user-id" }
-    }
-
-    const result = await Promise.race([
-      (async () => {
-        const { data: user, error } = await supabase.from("users").select("id").eq("email", email).maybeSingle()
-
-        if (error) throw error
-        return user || { id: "fallback-user-id" }
-      })(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Operation timeout")), 5000)),
-    ])
-
-    return result as any
-  } catch (error: any) {
-    console.error("[v0] getUserByEmail failed:", error?.message || error)
-    supabaseHealthy = false
-    return { id: "fallback-user-id" }
+function generateUserIdFromEmail(email: string): string {
+  // Create a deterministic user ID from email without database lookup
+  const cleanEmail = email.toLowerCase().trim()
+  // Use a simple hash-like approach to create consistent user ID
+  let hash = 0
+  for (let i = 0; i < cleanEmail.length; i++) {
+    const char = cleanEmail.charCodeAt(i)
+    hash = (hash << 5) - hash + char
+    hash = hash & hash // Convert to 32-bit integer
   }
+  return `user_${Math.abs(hash)}`
 }
 
 async function safeSupabaseQuery(queryFn: () => Promise<any>, fallbackValue: any = null) {
@@ -77,20 +64,11 @@ export async function GET(request: NextRequest) {
   try {
     const userEmail = request.headers.get("x-user-email") || "tarcisiorp16@gmail.com"
 
-    let user
-    try {
-      user = await getUserByEmail(userEmail)
-    } catch (error: any) {
-      console.error("[v0] Critical error in getUserByEmail:", error?.message || error)
-      user = { id: "fallback-user-id" }
-    }
-
-    if (!user) {
-      user = { id: "fallback-user-id" }
-    }
+    const userId = generateUserIdFromEmail(userEmail)
+    console.log("[v0] Generated user ID:", userId, "for email:", userEmail)
 
     const { data: settings, error } = await safeSupabaseQuery(() =>
-      supabase.from("user_settings").select("*").eq("user_id", user.id).eq("key", "printer_settings").maybeSingle(),
+      supabase.from("user_settings").select("*").eq("user_id", userId).eq("key", "printer_settings").maybeSingle(),
     )
 
     if (error && error.code !== "PGRST116") {
@@ -122,17 +100,8 @@ export async function POST(request: NextRequest) {
   try {
     const userEmail = request.headers.get("x-user-email") || "tarcisiorp16@gmail.com"
 
-    let user
-    try {
-      user = await getUserByEmail(userEmail)
-    } catch (error: any) {
-      console.error("[v0] Critical error in getUserByEmail:", error?.message || error)
-      user = { id: "fallback-user-id" }
-    }
-
-    if (!user) {
-      user = { id: "fallback-user-id" }
-    }
+    const userId = generateUserIdFromEmail(userEmail)
+    console.log("[v0] Generated user ID:", userId, "for email:", userEmail)
 
     const body = await request.json()
     const { defaultPrinter, showLogo, showTitle, showAddress, showPhone } = body
@@ -148,7 +117,7 @@ export async function POST(request: NextRequest) {
     const { error } = await safeSupabaseQuery(() =>
       supabase.from("user_settings").upsert(
         {
-          user_id: user.id,
+          user_id: userId,
           key: "printer_settings",
           value: printerSettings,
         },
