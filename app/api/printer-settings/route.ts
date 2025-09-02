@@ -1,48 +1,95 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+let supabase: any = null
+try {
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+  } else {
+    console.warn("[v0] Supabase environment variables not configured")
+  }
+} catch (error) {
+  console.error("[v0] Failed to create Supabase client:", error)
+  supabase = null
+}
 
 async function getUserByEmail(email: string) {
   try {
-    // Test connection first
-    const connectionTest = await Promise.race([
-      supabase.from("users").select("count").limit(1),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Connection timeout")), 5000)),
-    ])
-
-    if (!connectionTest) {
-      console.warn("[v0] Supabase connection test failed, using fallback")
+    // Return fallback immediately if Supabase client is not available
+    if (!supabase) {
+      console.warn("[v0] Supabase client not available, using fallback user")
       return { id: "fallback-user-id" }
     }
 
-    const { data: user, error } = (await Promise.race([
-      supabase.from("users").select("id").eq("email", email).maybeSingle(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Query timeout")), 8000)),
-    ])) as any
+    // Wrap all Supabase operations in additional try-catch
+    try {
+      // Test connection first with shorter timeout
+      const connectionTest = await Promise.race([
+        supabase
+          .from("users")
+          .select("count")
+          .limit(1)
+          .then((result: any) => result),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Connection timeout")), 3000)),
+      ]).catch((error: any) => {
+        console.warn("[v0] Connection test failed:", error.message)
+        return null
+      })
 
-    if (error) {
-      console.error("Erro ao buscar usuário:", error)
-      // Return fallback user instead of null
+      if (!connectionTest) {
+        console.warn("[v0] Supabase connection test failed, using fallback")
+        return { id: "fallback-user-id" }
+      }
+
+      const userQuery = await Promise.race([
+        supabase
+          .from("users")
+          .select("id")
+          .eq("email", email)
+          .maybeSingle()
+          .then((result: any) => result),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Query timeout")), 5000)),
+      ]).catch((error: any) => {
+        console.warn("[v0] User query failed:", error.message)
+        return { data: null, error: error }
+      })
+
+      if (userQuery?.error) {
+        console.error("Erro ao buscar usuário:", userQuery.error)
+        return { id: "fallback-user-id" }
+      }
+
+      return userQuery?.data || { id: "fallback-user-id" }
+    } catch (supabaseError) {
+      console.error("[v0] Supabase operation failed:", supabaseError)
       return { id: "fallback-user-id" }
     }
-
-    return user || { id: "fallback-user-id" }
-  } catch (error) {
-    console.error("Erro na conexão com Supabase:", error)
-    // Return fallback user to prevent API failure
+  } catch (globalError) {
+    console.error("[v0] Global error in getUserByEmail:", globalError)
     return { id: "fallback-user-id" }
   }
 }
 
 async function safeSupabaseQuery(queryFn: () => Promise<any>, fallbackValue: any = null) {
   try {
-    return await Promise.race([
-      queryFn(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Query timeout")), 10000)),
-    ])
+    if (!supabase) {
+      console.warn("[v0] Supabase client not available for query")
+      return { data: fallbackValue, error: null }
+    }
+
+    const result = await Promise.race([
+      queryFn()
+        .then((result: any) => result)
+        .catch((error: any) => ({ data: fallbackValue, error })),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Query timeout")), 8000)),
+    ]).catch((error: any) => {
+      console.warn("[v0] Query race failed:", error.message)
+      return { data: fallbackValue, error: error }
+    })
+
+    return result
   } catch (error) {
-    console.error("Supabase query failed:", error)
+    console.error("[v0] Safe query wrapper failed:", error)
     return { data: fallbackValue, error: null }
   }
 }
