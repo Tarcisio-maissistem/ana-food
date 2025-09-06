@@ -53,7 +53,7 @@ async function getUserByEmail(email: string): Promise<string | null> {
     }
 
     const { data: user, error } = await Promise.race([
-      supabase.from("users").select("id").eq("email", email).single(),
+      supabase.from("users").select("id").eq("email", email).maybeSingle(),
       new Promise<any>((_, reject) => setTimeout(() => reject(new Error("Query timeout")), 8000)),
     ])
 
